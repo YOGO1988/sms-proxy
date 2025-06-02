@@ -1,0 +1,19 @@
+{
+  "name": "yogoevents-sms-proxy",
+  "version": "1.0.0",
+  "description": "SMS Proxy for SerwerSMS.pl - YO&GO Events",
+  "main": "api/index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "sms",
+    "proxy",
+    "serwersms",
+    "yogoevents",
+    "vercel"
+  ],
+  "author": "YO&GO Events",
+  "license": "MIT"
+}
