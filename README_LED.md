@@ -1,234 +1,288 @@
-# LED Display Integration for Race Timing System
+# LED Display Integration - Quick Reference
 
 **YO&GO Events - 2025**
 
-System integracji tablicy LED z systemem pomiaru czasu w zawodach sportowych.
+> **FIXED VERSION** - Based on actual protocol from your working chronometer program
 
-## 🎯 Funkcje
+---
 
-- ✅ **Automatyczne wyświetlanie czasów** - system sam dobiera tryb wyświetlania
-- ✅ **1 zawodnik** → czas w jednej linii
-- ✅ **2 zawodników** → czasy w dwóch liniach
-- ✅ **Więcej zawodników** → automatyczna rotacja (pokazuje po 2, potem kolejne 2, itd.)
-- ✅ **Czyszczenie tablicy** - przy rozpoczęciu nowego biegu (sygnał że system działa)
-- ✅ **Nazwa wydarzenia** - opcjonalne wyświetlanie nazwy zawodów
-- ✅ **Auto-detekcja** - automatyczne wykrywanie portu COM i baudrate
+## Quick Start (5 minutes)
 
-## 📦 Co znajduje się w pakiecie?
-
-| Plik | Opis |
-|------|------|
-| `led_display.py` | Główny moduł - gotowy do integracji z Twoim programem |
-| `led_autotest.py` | Narzędzie testowe - znajdź właściwy port i baudrate |
-| `led_demo.py` | Program demonstracyjny - zobacz jak to działa |
-| `LED_INTEGRATION.md` | Szczegółowa instrukcja integracji |
-| `requirements.txt` | Zależności Pythona |
-
-## ⚡ Szybki start
-
-### 1. Instalacja
+### 1. Test the Display
 
 ```bash
-# Zainstaluj zależności
-pip install -r requirements.txt
+python test_fixed_protocol.py
 ```
 
-### 2. Test połączenia
+Watch your LED display! It will test:
+- ✅ Clearing
+- ✅ Single time
+- ✅ Two times
+- ✅ Rotation (4 competitors)
+- ✅ Event name
 
-```bash
-# Uruchom narzędzie testowe
-python led_autotest.py
-```
-
-Program automatycznie:
-- Znajdzie dostępne porty COM
-- Przetestuje różne baudrate (9600, 19200, 38400, 57600, 115200)
-- Zapisze wyniki testów do pliku
-
-**Zanotuj który baudrate działał!**
-
-### 3. Demo
-
-```bash
-# Uruchom program demonstracyjny
-python led_demo.py
-
-# LUB szybki test wszystkich funkcji
-python led_demo.py --quick
-```
-
-### 4. Integracja z Twoim programem
-
-**Minimalny przykład:**
+### 2. Use in Your Program
 
 ```python
-from led_display import LEDDisplayManager
+from led_display_fixed import LEDDisplayManager
 
-# 1. Inicjalizacja
-led = LEDDisplayManager(port='COM3', baudrate=9600)
+# Initialize
+led = LEDDisplayManager(port='COM5', baudrate=9600)
 if not led.initialize():
-    print("Uwaga: Tablica niedostępna")
+    print("LED not available")
+    exit()
 
-# 2. Wyświetl nazwę wydarzenia (opcjonalnie)
-led.show_event_name("MISTRZOSTWA 2025", duration=5)
+# Clear before race
+led.clear_display()
 
-# 3. Gdy rozpoczyna się nowy bieg - wyczyść tablicę
-led.clear_display()  # Tablica się wyłączy = sygnał że działa
-
-# 4. Po zakończeniu biegu - pokaż wyniki
+# Show results after race
 led.update_race_results({
     'race_number': 1,
     'lanes': 2,
     'results': [
-        {'lane': 1, 'time': '01:23.456'},
-        {'lane': 2, 'time': '01:24.789'}
+        {'lane': 1, 'time': '00:07.835'},
+        {'lane': 2, 'time': '00:10.197'}
     ]
 })
 
-# 5. Na zakończenie programu
+# Cleanup
 led.shutdown()
 ```
 
-**To wszystko!** System sam zadba o właściwe wyświetlanie.
-
-## 📖 Dokumentacja
-
-Szczegółowa instrukcja integracji: **[LED_INTEGRATION.md](LED_INTEGRATION.md)**
-
-Zawiera:
-- Pełną dokumentację API
-- Przykłady integracji (GUI, web, konsola)
-- Rozwiązywanie problemów
-- Zaawansowane ustawienia
-
-## 🔧 Wymagania
-
-### Sprzęt
-- Konwerter USB-RS232 (jeśli komputer nie ma portu COM)
-- Tablica LED z interfejsem RS232/COM
-
-### Oprogramowanie
-- Python 3.7+
-- pyserial (automatycznie instalowane z requirements.txt)
-
-## 🚀 Jak to działa?
-
-### Jeden zawodnik
-```
-┌──────────────────────┐
-│  TOR 1: 01:23.456    │
-└──────────────────────┘
-```
-
-### Dwóch zawodników
-```
-┌──────────────────────┐
-│  TOR 1: 01:23.456    │
-│  TOR 2: 01:24.789    │
-└──────────────────────┘
-```
-
-### Czterech zawodników (rotacja co 3 sekundy)
-```
-[0-3s]                    [3-6s]                    [6-9s]
-┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
-│  TOR 1: 01:23.456    │  │  TOR 3: 01:25.123    │  │  TOR 1: 01:23.456    │
-│  TOR 2: 01:24.789    │  │  TOR 4: 01:26.456    │  │  TOR 2: 01:24.789    │
-└──────────────────────┘  └──────────────────────┘  └──────────────────────┘
-        ↓                         ↓                         ↓
-    (powrót na początek po wyświetleniu wszystkich)
-```
-
-## 💡 Przykładowe zastosowania
-
-### 1. System pomiaru czasu
-```python
-# Po zakończeniu pomiaru czasu
-def on_finish(lane, time):
-    results.append({'lane': lane, 'time': time})
-
-    # Aktualizuj tablicę
-    led.update_race_results({
-        'race_number': current_race,
-        'lanes': len(results),
-        'results': results
-    })
-```
-
-### 2. Import z pliku CSV
-```python
-import csv
-
-with open('results.csv') as f:
-    reader = csv.DictReader(f)
-    results = [
-        {'lane': int(row['lane']), 'time': row['time']}
-        for row in reader
-    ]
-
-led.update_race_results({
-    'race_number': 1,
-    'lanes': len(results),
-    'results': results
-})
-```
-
-### 3. Integracja z GUI (przycisk)
-```python
-def on_button_click():
-    # Pobierz wyniki z formularza
-    results = get_form_results()
-
-    # Wyświetl na tablicy
-    led.update_race_results({
-        'race_number': race_num,
-        'lanes': len(results),
-        'results': results
-    })
-```
-
-## 🔍 Rozwiązywanie problemów
-
-| Problem | Rozwiązanie |
-|---------|-------------|
-| Nie widać portów COM | Sprawdź czy konwerter USB-RS232 jest podłączony, zainstaluj sterowniki |
-| Tablica nie wyświetla | Uruchom `led_autotest.py` aby znaleźć właściwy baudrate |
-| "Permission denied" (Linux) | `sudo usermod -a -G dialout $USER` |
-| Krzaki zamiast tekstu | Zmień encoding w kodzie |
-| Rotacja nie działa | Upewnij się że przekazujesz >2 wyniki |
-
-Więcej w [LED_INTEGRATION.md](LED_INTEGRATION.md#rozwiązywanie-problemów)
-
-## 📋 Checklist integracji
-
-- [ ] Zainstalować `pyserial`
-- [ ] Uruchomić `led_autotest.py` i znaleźć działający baudrate
-- [ ] Przetestować `led_demo.py`
-- [ ] Skopiować `led_display.py` do folderu programu
-- [ ] Zaimportować `LEDDisplayManager`
-- [ ] Dodać inicjalizację na początku programu
-- [ ] Dodać `clear_display()` przy rozpoczęciu biegu
-- [ ] Dodać `update_race_results()` po zakończeniu biegu
-- [ ] Dodać `shutdown()` przy zamykaniu programu
-- [ ] Przetestować na żywym systemie!
-
-## 🎓 Przykład kompletnej integracji
-
-Zobacz plik [led_demo.py](led_demo.py) - zawiera pełny przykład programu z GUI,
-obsługą błędów i wszystkimi funkcjami.
-
-## 📞 Wsparcie
-
-1. Przeczytaj [LED_INTEGRATION.md](LED_INTEGRATION.md)
-2. Uruchom `led_autotest.py` i prześlij logi
-3. Sprawdź sekcję "Rozwiązywanie problemów"
-
-## 📄 Licencja
-
-Kod stworzony dla YO&GO Events - 2025
+**Done! That's all you need!**
 
 ---
 
-**Powodzenia z integracją! 🎉**
+## Available Tools
 
-Jeśli masz pytania lub problemy, uruchom testy i prześlij wyniki.
+| Tool | Purpose | When to Use |
+|------|---------|-------------|
+| `test_fixed_protocol.py` | Test with real hardware | **Start here** - verify display works |
+| `simulate_protocol.py` | View protocol bytes | Debug without hardware |
+| `example_race_integration.py` | Integration examples | Learn how to integrate |
+| `led_display_fixed.py` | Main module | Import this in your code |
+
+---
+
+## Testing Without Hardware
+
+Want to see what bytes are sent?
+
+```bash
+python simulate_protocol.py
+```
+
+Output:
+```
+INITIALIZATION SEQUENCE
+Set9600 command (sent 3x):
+HEX (10 bytes):
+  1B 09 0A 00 A4 EB 00 00 0D 0A
+
+ASCII: [1B][09][0A][00]¤ë[00][00][0D][0A]
+```
+
+Interactive mode:
+```bash
+python simulate_protocol.py --interactive
+```
+
+---
+
+## Integration Examples
+
+```bash
+python example_race_integration.py
+```
+
+Choose:
+1. Single race (1 competitor)
+2. Two-lane race (2 competitors)
+3. Multi-lane race (4 competitors, rotation)
+4. Integration template for your code
+
+---
+
+## How It Works
+
+### Display Behavior
+
+**1 competitor:**
+```
+Line 1: 00'07".835 TOR 1
+Line 2: (empty)
+```
+
+**2 competitors:**
+```
+Line 1: 00'07".835 TOR 1
+Line 2: 00'10".197 TOR 2
+```
+
+**3+ competitors:**
+- Rotates pairs every 3 seconds
+- Shows lanes 1-2, then 3-4, then 1-2...
+- Continues until stopped
+
+### Time Format
+
+**Your code provides:** `MM:SS.mmm` (e.g., `00:07.835`)
+
+**Display shows:** `MM'SS".mmm TOR X` (e.g., `00'07".835 TOR 1`)
+
+**Conversion happens automatically!** You don't need to do anything.
+
+---
+
+## Protocol Details
+
+Full documentation: `PROTOCOL_ANALYSIS.md`
+
+Key points:
+- **Baudrate:** 9600
+- **Commands:** Start with `1B` (ESC)
+- **Line selection:** Byte at position 18 (`00`=line 1, `10`=line 2)
+- **Time format:** Uses `'` and `"` instead of `:`
+- **Initialization:** Sends `Set9600` command 3 times
+
+---
+
+## Troubleshooting
+
+### Display doesn't respond
+
+1. Check power
+2. Verify COM port (is it really COM5?)
+3. Check cable connection
+4. Run `python simulate_protocol.py` to verify protocol
+
+### Wrong port
+
+Edit your code:
+```python
+led = LEDDisplayManager(port='COM5', baudrate=9600)  # Change COM5
+```
+
+Or make it ask:
+```python
+port = input("COM Port: ") or "COM5"
+led = LEDDisplayManager(port=port, baudrate=9600)
+```
+
+### Times not displaying correctly
+
+The module handles format conversion automatically. You provide `MM:SS.mmm`, it converts to `MM'SS".mmm`.
+
+If times still wrong, check:
+- Is time in correct format? (`00:07.835`)
+- Is lane number provided? (`{'lane': 1, 'time': '00:07.835'}`)
+
+### Display shows garbage
+
+This means protocol mismatch. Run:
+```bash
+python simulate_protocol.py
+```
+
+Compare output with `PROTOCOL_ANALYSIS.md`. If they match but display still shows garbage, the display might use different protocol variant.
+
+---
+
+## Files
+
+### Use These ✅
+- `led_display_fixed.py` - **Main module (FIXED!)**
+- `test_fixed_protocol.py` - Hardware test
+- `simulate_protocol.py` - Protocol viewer
+- `example_race_integration.py` - Examples
+- `PROTOCOL_ANALYSIS.md` - Protocol documentation
+- `INSTRUKCJA_NAPRAWY.md` - Full instructions (Polish)
+
+### Ignore These ❌
+- `led_display.py` - Old version (DOESN'T WORK)
+- `led_autotest.py` - Old testing tool
+- `diagnose_led.py` - Old diagnostic
+- `simple_send.py` - Old test
+
+---
+
+## API Reference
+
+### LEDDisplayManager
+
+#### `__init__(port, baudrate=9600)`
+Create display manager.
+- `port`: COM port (e.g., `'COM5'`)
+- `baudrate`: Always 9600 for your display
+
+#### `initialize() -> bool`
+Connect to display. Returns `True` if successful.
+
+#### `clear_display()`
+Clear/turn off display. Use before each race.
+
+#### `update_race_results(race_data: dict)`
+Display race results. Automatically handles 1, 2, or many competitors.
+
+**race_data format:**
+```python
+{
+    'race_number': 1,
+    'lanes': 2,
+    'results': [
+        {'lane': 1, 'time': '00:07.835'},
+        {'lane': 2, 'time': '00:10.197'}
+    ]
+}
+```
+
+#### `show_event_name(name: str, duration: float = 5.0)`
+Show event name. Optional.
+- `name`: Event name to display
+- `duration`: How long to show (seconds)
+
+#### `shutdown()`
+Disconnect and cleanup. Call when program exits.
+
+---
+
+## Next Steps
+
+1. **Test:** `python test_fixed_protocol.py`
+2. **Learn:** `python example_race_integration.py`
+3. **Integrate:** Add 5 lines to your code (see Quick Start)
+4. **Race!** 🏁
+
+---
+
+## What's Different from Old Version?
+
+The old `led_display.py` **didn't work** because it assumed standard ASCII protocol.
+
+Your display uses **custom manufacturer protocol:**
+- Special initialization command (`Set9600`)
+- Binary command structure (`1B 07`, `1B 08`, `1B 09`)
+- Custom time format (`00'07".835` not `00:07.835`)
+- Line selection bytes
+
+The new `led_display_fixed.py` implements the **exact protocol** from your working chronometer program.
+
+---
+
+## Support
+
+If display doesn't work:
+
+1. Run `python test_fixed_protocol.py`
+2. Note which tests pass/fail
+3. Check what appears on display
+4. Report back with:
+   - Which tests worked?
+   - What did display show?
+   - Any errors in console?
+
+---
+
+**Good luck! 🎉**
+
+For complete instructions in Polish: `INSTRUKCJA_NAPRAWY.md`
