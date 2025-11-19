@@ -129,12 +129,51 @@ Pełna dokumentacja w `PROTOCOL_ANALYSIS.md`!
 | Plik | Opis | Status |
 |------|------|--------|
 | `led_display_fixed.py` | **GŁÓWNY MODUŁ** - używaj TEGO! | ✅ NAPRAWIONY |
-| `test_fixed_protocol.py` | Test protokołu | ✅ GOTOWY |
+| `test_fixed_protocol.py` | Test protokołu z tablicą | ✅ GOTOWY |
+| `simulate_protocol.py` | **NOWY!** Symulacja protokołu (bez sprzętu) | ✅ GOTOWY |
+| `example_race_integration.py` | **NOWY!** Przykłady integracji | ✅ GOTOWY |
 | `PROTOCOL_ANALYSIS.md` | Dokumentacja protokołu | ✅ KOMPLETNA |
 | ~~`led_display.py`~~ | Stara wersja (NIE DZIAŁA) | ❌ PRZESTARZAŁY |
 | `led_autotest.py` | Narzędzie testowe | ℹ️ POMOCNICZE |
 | `diagnose_led.py` | Diagnostyka | ℹ️ POMOCNICZE |
 | `simple_send.py` | Prosty test wysyłania | ℹ️ POMOCNICZE |
+
+---
+
+## 🛠️ DODATKOWE NARZĘDZIA
+
+### Symulacja protokołu (bez sprzętu)
+Jeśli chcesz zobaczyć **DOKŁADNIE jakie bajty** są wysyłane do tablicy:
+
+```bash
+python simulate_protocol.py
+```
+
+To pokaże:
+- Komendę inicjalizacyjną w HEX
+- Komendy wyświetlania czasów
+- Porównanie z oryginalnym programem
+- Wszystko w czytelnym formacie HEX + ASCII
+
+**Tryb interaktywny:**
+```bash
+python simulate_protocol.py --interactive
+```
+
+### Przykłady integracji
+Nie wiesz jak połączyć z Twoim programem? Zobacz przykłady:
+
+```bash
+python example_race_integration.py
+```
+
+Pokazuje:
+1. ✅ Jeden zawodnik
+2. ✅ Dwa tory
+3. ✅ Cztery tory (z rotacją)
+4. ✅ Szablon dla Twojego kodu
+
+**Każdy przykład można uruchomić osobno!**
 
 ---
 
