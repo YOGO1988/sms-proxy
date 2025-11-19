@@ -1,0 +1,11 @@
+# LED Display Module Requirements
+# YO&GO Events - 2025
+
+# Główna zależność - komunikacja szeregowa
+pyserial>=3.5
+
+# Opcjonalne - dla lepszego wykrywania portów
+pyserial-asyncio>=0.6
+
+# Dla testów (opcjonalne)
+pytest>=7.0.0
