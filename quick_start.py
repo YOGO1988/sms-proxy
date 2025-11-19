@@ -14,10 +14,16 @@ def main():
     print("LED Display - Quick Start")
     print("=" * 50)
 
+    # KROK 1: Auto-wykryj port LUB użyj None aby program sam wykrył
+    # Możesz też podać konkretny port: port='COM5', port='/dev/ttyUSB0'
+    print("\n⚠️  UWAGA: Podaj port i baudrate z testów!")
+    port = input("Port COM (Enter = auto-detect): ").strip() or None
+
+    baudrate_input = input("Baudrate (Enter = 9600): ").strip()
+    baudrate = int(baudrate_input) if baudrate_input else 9600
+
     # KROK 1: Utwórz manager
-    # Zmień 'COM3' na swój port (Windows: COM3, Linux: /dev/ttyUSB0)
-    # Zmień 9600 na baudrate swojej tablicy
-    led = LEDDisplayManager(port='COM3', baudrate=9600)
+    led = LEDDisplayManager(port=port, baudrate=baudrate)
 
     # KROK 2: Połącz z tablicą
     if not led.initialize():
