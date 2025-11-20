@@ -22,6 +22,67 @@ import struct
 from typing import List, Tuple, Optional
 
 
+def calculate_crc16(data: bytes) -> int:
+    """
+    Calculate CRC16 for LED display packets
+    Uses CRC16-MODBUS algorithm
+    """
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            if crc & 0x0001:
+                crc = (crc >> 1) ^ 0xA001
+            else:
+                crc >>= 1
+    return crc
+
+
+def create_ranking_packet(time_str: str, place: int, line: int) -> bytes:
+    """
+    Create a packet for ranking mode with place number
+
+    Args:
+        time_str: Time string like "00:07.787"
+        place: Place number (1, 2, 3, 4, ...)
+        line: Display line (1 or 2)
+
+    Returns:
+        Complete packet with correct checksum
+    """
+    # Base packet structure from time_7sec_tor1
+    base_packet = bytearray.fromhex('1B 07 3E 00 00 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00'.replace(' ', ''))
+
+    # Set line address (byte 18): 0x00 for line 1, 0x10 for line 2
+    base_packet[18] = 0x00 if line == 1 else 0x10
+
+    # Convert time string to display format
+    # "00:07.787" -> "00'07".787 "
+    time_display = time_str.replace(':', "'").replace('.', '".')
+    time_bytes = time_display.encode('ascii')
+
+    # Add place number like "1.   " (5 bytes total, same length as "TOR 1")
+    place_text = f"{place}.   ".encode('ascii')[:5].ljust(5)
+
+    # Build text part: time + space + place + padding
+    text_part = time_bytes + b' ' + place_text + b' ' * 20  # Add padding
+    text_part = text_part[:40]  # Limit to 40 chars
+
+    # Combine all parts (without checksum yet)
+    packet_without_crc = base_packet + text_part + b'\x0d\x0a'
+
+    # Calculate checksum for bytes after header (from byte 6 onwards)
+    data_for_crc = packet_without_crc[6:]
+    crc = calculate_crc16(data_for_crc)
+
+    # Insert checksum (little endian) at bytes 4-5
+    final_packet = bytearray(packet_without_crc)
+    final_packet[4] = crc & 0xFF
+    final_packet[5] = (crc >> 8) & 0xFF
+
+    return bytes(final_packet)
+
+
 class LEDDisplay:
     """
     Driver for Color-LED display
@@ -169,6 +230,9 @@ class LEDDisplay:
     def turn_off(self):
         """Wygaszenie tablicy (brightness = 0%)"""
         print("🔴 Wygaszanie tablicy...")
+        # NAJPIERW wyczyść tablicę, potem wygaś
+        self.clear_display()
+        time.sleep(0.2)
         return self.set_brightness(0)
 
     def turn_on(self, brightness: int = 100):
@@ -243,6 +307,18 @@ class LEDDisplay:
     def show_time_10sec_tor2(self):
         """Show time ~10 seconds on TOR 2"""
         return self.send_packet('time_10sec_tor2')
+
+    def show_time_with_place(self, time_str: str, place: int, line: int = 1):
+        """
+        Show time with place number (for ranking mode)
+
+        Args:
+            time_str: Time string like "00:07.787"
+            place: Place number (1, 2, 3, 4, ...)
+            line: Display line (1 or 2)
+        """
+        packet = create_ranking_packet(time_str, place, line)
+        return self.send_packet(packet)
 
 
 class LEDDisplayManager:
@@ -332,19 +408,26 @@ class LEDDisplayManager:
 
             if len(pair) == 1:
                 # Single result - show on line 1
-                print(f"  📊 Miejsce {index+1}: {pair[0].get('time', 'DNS')}")
-                self.display.show_time_7sec_tor1()  # Example time
+                place = index + 1
+                time_str = pair[0].get('time', '00:00.000')
+                print(f"  📊 Miejsce {place}: {time_str}")
+                self.display.show_time_with_place(time_str, place, line=1)
 
             elif len(pair) == 2:
-                # Two results - show both
-                print(f"  📊 Miejsca {index+1}-{index+2}:")
-                print(f"     {index+1}. {pair[0].get('time', 'DNS')}")
-                print(f"     {index+2}. {pair[1].get('time', 'DNS')}")
+                # Two results - show both with place numbers
+                place1 = index + 1
+                place2 = index + 2
+                time1 = pair[0].get('time', '00:00.000')
+                time2 = pair[1].get('time', '00:00.000')
 
-                # Show both times
-                self.display.show_time_7sec_tor1()
+                print(f"  📊 Miejsca {place1}-{place2}:")
+                print(f"     {place1}. {time1}")
+                print(f"     {place2}. {time2}")
+
+                # Show both times with place numbers
+                self.display.show_time_with_place(time1, place1, line=1)
                 time.sleep(0.1)
-                self.display.show_time_10sec_tor2()
+                self.display.show_time_with_place(time2, place2, line=2)
 
             # Wait before next pair
             time.sleep(3.0)
@@ -411,16 +494,19 @@ class LEDDisplayManager:
             results_sorted = sorted(results, key=lambda x: x.get('place', 999))
 
             if len(results_sorted) <= 2:
-                # Show without rotation
+                # Show without rotation - with place numbers
                 if len(results_sorted) == 1:
-                    print(f"   1. {results_sorted[0].get('time', 'DNS')}")
-                    self.display.show_time_7sec_tor1()
+                    time1 = results_sorted[0].get('time', '00:00.000')
+                    print(f"   1. {time1}")
+                    self.display.show_time_with_place(time1, 1, line=1)
                 else:
-                    print(f"   1. {results_sorted[0].get('time', 'DNS')}")
-                    print(f"   2. {results_sorted[1].get('time', 'DNS')}")
-                    self.display.show_time_7sec_tor1()
+                    time1 = results_sorted[0].get('time', '00:00.000')
+                    time2 = results_sorted[1].get('time', '00:00.000')
+                    print(f"   1. {time1}")
+                    print(f"   2. {time2}")
+                    self.display.show_time_with_place(time1, 1, line=1)
                     time.sleep(0.1)
-                    self.display.show_time_10sec_tor2()
+                    self.display.show_time_with_place(time2, 2, line=2)
             else:
                 # Rotation for 3+ results
                 self.rotation_active = True
