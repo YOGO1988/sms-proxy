@@ -113,6 +113,80 @@ def create_time_packet_line2(time_str: str, add_dash: bool = False) -> bytes:
     return bytes(base)
 
 
+def create_finish_packet_line1(time_str: str) -> bytes:
+    """
+    Pakiet finałowy dla toru 1 (linia 1) z nazwą toru
+    Args:
+        time_str: Czas w formacie "MM:SS.mmm"
+    Returns:
+        Pakiet bajtów z tekstem "00'XX".XXX TOR 1"
+    """
+    # Używamy komendy 0x3E dla pakietów finałowych
+    base = bytearray.fromhex('1B 07 3E 00 A1 2A 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 37 22 2E 37 38 37 20 54 4F 52 20 31 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+
+    # Format czasu: MM:SS.mmm -> MM'SS".mmm
+    parts = time_str.split(':')
+    if len(parts) == 2:
+        minutes = parts[0]
+        sec_parts = parts[1].split('.')
+        if len(sec_parts) == 2:
+            formatted = f"{minutes}'{sec_parts[0]}\".{sec_parts[1]}"
+        else:
+            formatted = f"{minutes}'{parts[1]}\""
+    else:
+        formatted = time_str
+
+    # Dodaj nazwę toru
+    display_text = f"{formatted} TOR 1 ".ljust(38)[:38]
+    base[22:60] = display_text.encode('ascii', errors='replace')
+
+    # Przelicz CRC
+    base[4] = 0
+    base[5] = 0
+    crc = calculate_crc16(bytes(base))
+    base[4] = crc & 0xFF
+    base[5] = (crc >> 8) & 0xFF
+
+    return bytes(base)
+
+
+def create_finish_packet_line2(time_str: str) -> bytes:
+    """
+    Pakiet finałowy dla toru 2 (linia 2) z nazwą toru
+    Args:
+        time_str: Czas w formacie "MM:SS.mmm"
+    Returns:
+        Pakiet bajtów z tekstem "00'XX".XXX TOR 2"
+    """
+    # Używamy komendy 0x3E dla pakietów finałowych
+    base = bytearray.fromhex('1B 07 3E 00 8F 5C 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 30 30 27 31 30 22 2E 33 36 32 20 54 4F 52 20 32 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+
+    # Format czasu: MM:SS.mmm -> MM'SS".mmm
+    parts = time_str.split(':')
+    if len(parts) == 2:
+        minutes = parts[0]
+        sec_parts = parts[1].split('.')
+        if len(sec_parts) == 2:
+            formatted = f"{minutes}'{sec_parts[0]}\".{sec_parts[1]}"
+        else:
+            formatted = f"{minutes}'{parts[1]}\""
+    else:
+        formatted = time_str
+
+    # Dodaj nazwę toru
+    display_text = f"{formatted} TOR 2 ".ljust(38)[:38]
+    base[22:60] = display_text.encode('ascii', errors='replace')
+
+    # Przelicz CRC
+    base[4] = 0
+    base[5] = 0
+    crc = calculate_crc16(bytes(base))
+    base[4] = crc & 0xFF
+    base[5] = (crc >> 8) & 0xFF
+
+    return bytes(base)
+
+
 def create_ranking_packet(time_str: str, place: int, line: int) -> bytes:
     """
     Pakiet rankingowy (miejsce + czas)
@@ -2371,6 +2445,12 @@ class ChronometerManager:
         self.left_lane_finished = False
         self.right_lane_finished = False
 
+        # Wyczyść flagi finishowe LED
+        if hasattr(self, '_left_finish_sent'):
+            delattr(self, '_left_finish_sent')
+        if hasattr(self, '_right_finish_sent'):
+            delattr(self, '_right_finish_sent')
+
         self.last_crossing_time = {1: 0, 3: 0, 4: 0}
 
         # DEBUG: reset debug flags
@@ -2410,6 +2490,12 @@ class ChronometerManager:
             self.osf_all_left_crossings.clear()
             self.osf_all_right_crossings.clear()
 
+            # Wyczyść flagi finishowe LED
+            if hasattr(self, '_left_finish_sent'):
+                delattr(self, '_left_finish_sent')
+            if hasattr(self, '_right_finish_sent'):
+                delattr(self, '_right_finish_sent')
+
             self.last_crossing_time = {1: 0, 3: 0, 4: 0}
 
             self.next_race_btn.config(state='normal')
@@ -2444,40 +2530,38 @@ class ChronometerManager:
 
             # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (OSF) ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                # TRYBY Z DWOMA TORAMI - NIEZALEŻNE ZEGARY NA OBIE LINIE
+                # TRYBY Z DWOMA TORAMI - WSPÓLNY ZEGAR DLA OBUBIEGNĄCYCH TORÓW
                 if self.current_mode in [MeasurementMode.OSF_DWA_TORY,
                                         MeasurementMode.OSF_DRUZYNA,
                                         MeasurementMode.WACHADLO]:
 
                     # === LINIA 1 (TOR LEWY) ===
                     if self.left_lane_finished and self.left_lane_result is not None:
-                        # Tor lewy SKOŃCZYŁ - pokaż WYNIK z myślnikiem (NIE aktualizuj!)
-                        left_time_str = self.format_time_mmss(self.left_lane_result)
-                        packet1 = create_time_packet_line1(left_time_str, add_dash=True)
-                        # DEBUG: loguj tylko raz
-                        if not hasattr(self, '_debug_left_done'):
-                            print(f"📺 DEBUG LED L1: TOR LEWY SKOŃCZYŁ - wynik={left_time_str} (ZAMROŻONY)")
-                            self._debug_left_done = True
+                        # Tor lewy SKOŃCZYŁ - wyślij pakiet finałowy z nazwą toru TYLKO RAZ
+                        if not hasattr(self, '_left_finish_sent'):
+                            left_time_str = self.format_time_mmss(self.left_lane_result)
+                            packet1 = create_finish_packet_line1(left_time_str)
+                            self.led_manager.display.send_packet(packet1, delay=0.02)
+                            self._left_finish_sent = True
+                            print(f"📺 LED: TOR LEWY SKOŃCZYŁ - {left_time_str} (pakiet finałowy wysłany)")
                     else:
-                        # Tor lewy BIEGA - pokaż BIEGNĄCY CZAS (zsynchronizowany z GUI!)
+                        # Tor lewy BIEGA - pokaż WSPÓLNY BIEGNĄCY CZAS (taki sam jak tor prawy!)
                         packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
+                        self.led_manager.display.send_packet(packet1, delay=0.02)
 
                     # === LINIA 2 (TOR PRAWY) ===
                     if self.right_lane_finished and self.right_lane_result is not None:
-                        # Tor prawy SKOŃCZYŁ - pokaż WYNIK z myślnikiem (NIE aktualizuj!)
-                        right_time_str = self.format_time_mmss(self.right_lane_result)
-                        packet2 = create_time_packet_line2(right_time_str, add_dash=True)
-                        # DEBUG: loguj tylko raz
-                        if not hasattr(self, '_debug_right_done'):
-                            print(f"📺 DEBUG LED L2: TOR PRAWY SKOŃCZYŁ - wynik={right_time_str} (ZAMROŻONY)")
-                            self._debug_right_done = True
+                        # Tor prawy SKOŃCZYŁ - wyślij pakiet finałowy z nazwą toru TYLKO RAZ
+                        if not hasattr(self, '_right_finish_sent'):
+                            right_time_str = self.format_time_mmss(self.right_lane_result)
+                            packet2 = create_finish_packet_line2(right_time_str)
+                            self.led_manager.display.send_packet(packet2, delay=0)
+                            self._right_finish_sent = True
+                            print(f"📺 LED: TOR PRAWY SKOŃCZYŁ - {right_time_str} (pakiet finałowy wysłany)")
                     else:
-                        # Tor prawy BIEGA - pokaż BIEGNĄCY CZAS (zsynchronizowany z GUI!)
+                        # Tor prawy BIEGA - pokaż WSPÓLNY BIEGNĄCY CZAS (taki sam jak tor lewy!)
                         packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
-
-                    # WYŚLIJ PAKIETY BEZ BLOKOWANIA - opóźnienie w send_packet
-                    self.led_manager.display.send_packet(packet1, delay=0.02)
-                    self.led_manager.display.send_packet(packet2, delay=0)
+                        self.led_manager.display.send_packet(packet2, delay=0)
 
                 else:
                     # TRYBY POJEDYNCZE - jeden zegar
@@ -2586,6 +2670,12 @@ class ChronometerManager:
         self.right_lane_finished = False
         self.left_lane_crossings = []
         self.right_lane_crossings = []
+
+        # Wyczyść flagi finishowe LED
+        if hasattr(self, '_left_finish_sent'):
+            delattr(self, '_left_finish_sent')
+        if hasattr(self, '_right_finish_sent'):
+            delattr(self, '_right_finish_sent')
 
         self.osf_all_left_crossings = []
         self.osf_all_right_crossings = []
