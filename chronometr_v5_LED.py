@@ -2542,14 +2542,15 @@ class ChronometerManager:
                                         MeasurementMode.WACHADLO]:
                     # KLUCZOWA NAPRAWA: Wysyłaj biegnący czas TYLKO dla torów które NIE zakończyły!
                     # To zapobiega nadpisywaniu wyników finałowych
+                    # UŻYWAMY PAKIETÓW FINAŁOWYCH (0x3E) ŻEBY POKAZAĆ NAZWY TORÓW
                     if not self.left_lane_finished:
-                        # TOR 1 (linia 1) - nadal biegnie
-                        packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
+                        # TOR 1 (linia 1) - nadal biegnie, POKAZUJ NAZWĘ "TOR 1"
+                        packet1 = create_finish_packet_line1(time_str_formatted)
                         self.led_manager.display.send_packet(packet1, delay=0.02)
 
                     if not self.right_lane_finished:
-                        # TOR 2 (linia 2) - nadal biegnie
-                        packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
+                        # TOR 2 (linia 2) - nadal biegnie, POKAZUJ NAZWĘ "TOR 2"
+                        packet2 = create_finish_packet_line2(time_str_formatted)
                         self.led_manager.display.send_packet(packet2, delay=0)
 
                 else:
