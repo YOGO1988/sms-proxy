@@ -2536,16 +2536,21 @@ class ChronometerManager:
 
             # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (OSF) ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                # TRYBY Z DWOMA TORAMI - DOKŁADNIE TAKA SAMA LOGIKA JAK W LEKKOATLETYCE
+                # TRYBY Z DWOMA TORAMI - każdy tor niezależnie
                 if self.current_mode in [MeasurementMode.OSF_DWA_TORY,
                                         MeasurementMode.OSF_DRUZYNA,
                                         MeasurementMode.WACHADLO]:
-                    # PROSTA LOGIKA Z LA: wyświetl ten sam czas na obu liniach
-                    packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
-                    self.led_manager.display.send_packet(packet1, delay=0.02)
+                    # KLUCZOWA NAPRAWA: Wysyłaj biegnący czas TYLKO dla torów które NIE zakończyły!
+                    # To zapobiega nadpisywaniu wyników finałowych
+                    if not self.left_lane_finished:
+                        # TOR 1 (linia 1) - nadal biegnie
+                        packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
+                        self.led_manager.display.send_packet(packet1, delay=0.02)
 
-                    packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
-                    self.led_manager.display.send_packet(packet2, delay=0)
+                    if not self.right_lane_finished:
+                        # TOR 2 (linia 2) - nadal biegnie
+                        packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
+                        self.led_manager.display.send_packet(packet2, delay=0)
 
                 else:
                     # TRYBY POJEDYNCZE - jeden zegar
