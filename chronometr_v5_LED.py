@@ -549,6 +549,17 @@ class ChronometerManager:
                                              length=80, width=10, bg='#e8e8e8')
         self.led_brightness_scale.pack(side=tk.LEFT, padx=3)
 
+        # === POLE TEKSTOWE STATYCZNE ===
+        tk.Label(top_frame, text="Tekst:", font=('Arial', 8), bg='#e8e8e8').pack(side=tk.LEFT, padx=(10, 3))
+
+        self.led_text_var = tk.StringVar()
+        self.led_text_entry = tk.Entry(top_frame, textvariable=self.led_text_var, font=('Arial', 9), width=20)
+        self.led_text_entry.pack(side=tk.LEFT, padx=3)
+
+        self.led_send_btn = tk.Button(top_frame, text="Wyślij", command=self.send_custom_text,
+                                      font=('Arial', 8), bg='#2196F3', fg='white', padx=8)
+        self.led_send_btn.pack(side=tk.LEFT, padx=3)
+
         # === NOTEBOOK (ZAKŁADKI) ===
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -620,6 +631,34 @@ class ChronometerManager:
         self.led_brightness = int(value)
         if self.led_enabled and self.led_manager:
             self.led_manager.display.set_brightness(self.led_brightness)
+
+    def send_custom_text(self):
+        """Wysyła własny tekst na tablicę LED"""
+        if not self.led_enabled or not self.led_manager:
+            messagebox.showwarning("LED", "Tablica LED nie jest podłączona!")
+            return
+
+        text = self.led_text_var.get().strip()
+        if not text:
+            messagebox.showwarning("Brak tekstu", "Wpisz tekst do wysłania!")
+            return
+
+        try:
+            # Zatrzymaj rotację jeśli jest aktywna
+            self.led_manager.stop_rotation()
+
+            # Wyślij tekst na obie linie
+            packet1 = create_time_packet_line1(text)
+            self.led_manager.display.send_packet(packet1, delay=0.05)
+
+            packet2 = create_time_packet_line2(text)
+            self.led_manager.display.send_packet(packet2, delay=0.05)
+
+            print(f"📺 LED: Wysłano tekst statyczny: '{text}'")
+            messagebox.showinfo("LED", f"Wysłano tekst:\n{text}")
+
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Nie udało się wysłać tekstu:\n{e}")
 
     def setup_osf_tab(self):
         """Zakładka OSF - interfejs użytkownika"""
@@ -1112,20 +1151,21 @@ class ChronometerManager:
         self.la_race_active = False
         self.la_start_time = None
         self.la_start_absolute_time = None
-        
+
         self.last_crossing_time = {1: 0, 3: 0, 4: 0}
-        
+
         self.la_status_label.config(text="✅ GOTOWY", bg='green')
         self.la_next_btn.config(state='disabled')
         self.la_manual_finish_btn.config(state='disabled')
         self.la_manage_results_btn.config(state='disabled')
         self.la_timer_label.config(text="00:00.00", fg='#4CAF50')
         self.la_update_results_display()
-        
-        # Wyczyść LED
+
+        # === ZATRZYMAJ ROTACJĘ RANKINGU I WYCZYŚĆ LED ===
         if self.led_enabled and self.led_manager:
+            self.led_manager.stop_rotation()  # WAŻNE: zatrzymaj rotację PRZED czyszczeniem
             self.led_manager.display.clear_display()
-        
+
         print("✅ [LA] KOLEJNY BIEG - gotowy")
 
     def la_manual_start(self):
@@ -1133,29 +1173,34 @@ class ChronometerManager:
         if self.la_race_active:
             messagebox.showwarning("Uwaga", "Bieg już trwa!")
             return
-        
+
+        # === WYCZYŚĆ LED PRZY STARCIE ===
+        if self.led_enabled and self.led_manager:
+            self.led_manager.stop_rotation()
+            self.led_manager.display.clear_display()
+
         if self.la_log_file is None:
             self.la_log_file = open(self.la_log_filename, 'a', encoding='utf-8')
             self.la_log_file.write(f"\n{'='*60}\n")
             self.la_log_file.write(f"BIEG LA - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             self.la_log_file.write(f"Liczba zawodników: {self.la_num_athletes}\n")
             self.la_log_file.write(f"{'='*60}\n")
-        
+
         self.la_race_active = True
         self.la_start_time = None
         self.la_start_absolute_time = time.time()
         self.la_results = []
         self.la_all_crossings = []
         self.la_pending_results = []
-        
+
         self.last_crossing_time = {1: 0, 3: 0, 4: 0}
-        
+
         self.la_status_label.config(text="🏃 TRWA BIEG (RĘCZNY)", bg='orange')
         self.la_next_btn.config(state='disabled')
         self.la_manual_finish_btn.config(state='normal')
         self.la_manage_results_btn.config(state='normal')
         self.la_update_results_display()
-        
+
         print("🖐️ [LA] START RĘCZNY")
 
     def la_manual_finish(self):
@@ -1671,6 +1716,11 @@ class ChronometerManager:
             # Routing
             if self.la_mode:
                 if not self.la_race_active and channel == 1:
+                    # === WYCZYŚĆ LED PRZY AUTOMATYCZNYM STARCIE LA ===
+                    if self.led_enabled and self.led_manager:
+                        self.led_manager.stop_rotation()
+                        self.led_manager.display.clear_display()
+
                     if self.la_log_file is None:
                         self.la_log_file = open(self.la_log_filename, 'a', encoding='utf-8')
                         self.la_log_file.write(f"\n{'='*60}\n")
@@ -1767,6 +1817,10 @@ class ChronometerManager:
             if not self.ready_for_start:
                 return
 
+            # === WYCZYŚĆ LED PRZY STARCIE ===
+            if self.led_enabled and self.led_manager:
+                self.led_manager.display.clear_display()
+
             self.start_time = time_seconds
             self.start_absolute_time = time.time()
             self.timer_running = True
@@ -1814,6 +1868,10 @@ class ChronometerManager:
         if channel == 1:
             if not self.ready_for_start:
                 return
+
+            # === WYCZYŚĆ LED PRZY STARCIE ===
+            if self.led_enabled and self.led_manager:
+                self.led_manager.display.clear_display()
 
             self.start_time = time_seconds
             self.start_absolute_time = time.time()
@@ -1942,6 +2000,10 @@ class ChronometerManager:
             if not self.ready_for_start:
                 return
 
+            # === WYCZYŚĆ LED PRZY STARCIE ===
+            if self.led_enabled and self.led_manager:
+                self.led_manager.display.clear_display()
+
             self.start_time = time_seconds
             self.start_absolute_time = time.time()
             self.timer_running = True
@@ -2069,6 +2131,10 @@ class ChronometerManager:
         if channel == 1:
             if not self.ready_for_start:
                 return
+
+            # === WYCZYŚĆ LED PRZY STARCIE ===
+            if self.led_enabled and self.led_manager:
+                self.led_manager.display.clear_display()
 
             self.start_time = time_seconds
             self.start_absolute_time = time.time()
@@ -2257,10 +2323,11 @@ class ChronometerManager:
         self.display_text.delete(1.0, tk.END)
         self.display_text.insert(tk.END, "⏳ Oczekiwanie na START...\n")
         self.display_text.config(state='disabled')
-        
-        # Wyczyść LED
+
+        # === ZATRZYMAJ ROTACJĘ (jeśli jest), ale NIE czyść LED ===
+        # Wynik zostaje na ekranie do momentu startu nowego biegu
         if self.led_enabled and self.led_manager:
-            self.led_manager.display.clear_display()
+            self.led_manager.stop_rotation()
 
     def reset_measurement(self):
         """Reset pomiaru"""
@@ -2295,6 +2362,20 @@ class ChronometerManager:
         if self.timer_running and self.start_absolute_time:
             elapsed = time.time() - self.start_absolute_time
             self.timer_label.config(text=self.format_time_mmss(elapsed), fg='#4CAF50')
+
+            # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (OSF) ===
+            if self.led_enabled and self.led_manager and self.led_manager.display.connected:
+                time_str = self.format_time_mmss(elapsed)
+
+                # Wyświetl na linii 1
+                packet = create_time_packet_line1(time_str)
+                self.led_manager.display.send_packet(packet, delay=0)
+
+                # Jeśli OSF DWA TORY - wyświetl też na linii 2
+                if self.current_mode == MeasurementMode.OSF_DWA_TORY:
+                    packet2 = create_time_packet_line2(time_str)
+                    self.led_manager.display.send_packet(packet2, delay=0)
+
         elif self.race_completed:
             self.timer_label.config(fg='#2196F3')
         else:
@@ -2303,6 +2384,18 @@ class ChronometerManager:
         if self.la_race_active and self.la_start_absolute_time:
             elapsed_la = time.time() - self.la_start_absolute_time
             self.la_timer_label.config(text=self.format_time_mmss(elapsed_la), fg='#4CAF50')
+
+            # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (LA) ===
+            if self.led_enabled and self.led_manager and self.led_manager.display.connected:
+                time_str = self.format_time_mmss(elapsed_la)
+
+                # Wyświetl na obu liniach dla lepszej widoczności
+                packet = create_time_packet_line1(time_str)
+                self.led_manager.display.send_packet(packet, delay=0)
+
+                if self.la_num_athletes >= 2:
+                    packet2 = create_time_packet_line2(time_str)
+                    self.led_manager.display.send_packet(packet2, delay=0)
         else:
             self.la_timer_label.config(text="00:00.00", fg='#9E9E9E')
 
