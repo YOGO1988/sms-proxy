@@ -125,13 +125,15 @@ def clear_line2(ser):
 class Timer:
     """Klasa do zarządzania licznikiem czasu"""
 
-    def __init__(self, ser, update_interval=0.2):
+    def __init__(self, ser, update_interval=0.1, reinit_each=False):
         self.ser = ser
         self.update_interval = update_interval  # Co ile sekund aktualizować wyświetlacz
+        self.reinit_each = reinit_each  # Czy wysyłać re-init przed każdą aktualizacją
         self.running = False
         self.start_time = None
         self.elapsed_ms = 0
         self.thread = None
+        self.update_count = 0
 
     def start(self):
         """Rozpoczyna liczenie"""
@@ -159,9 +161,21 @@ class Timer:
 
             # Wyślij na wyświetlacz
             try:
+                # Opcjonalnie: re-init przed każdą aktualizacją
+                if self.reinit_each:
+                    self.ser.write(INIT_PACKET)
+                    self.ser.flush()
+                    time.sleep(0.05)
+
                 packet = create_time_packet(time_str)
                 self.ser.write(packet)
                 self.ser.flush()
+
+                # Debug: wyświetl czas co 10 aktualizacji
+                self.update_count += 1
+                if self.update_count % 10 == 0:
+                    print(f"   📟 {time_str} (aktualizacja #{self.update_count})")
+
             except Exception as e:
                 print(f"❌ Błąd wysyłania: {e}")
                 self.running = False
@@ -176,10 +190,16 @@ def main():
     print("TEST START/STOP - STOPER SPORTOWY")
     print("="*70)
     print("\n📋 Scenariusz:")
-    print("   1. Inicjalizacja tablicy + czyszczenie linii 2")
-    print("   2. Naciśnij Enter → START (czas zaczyna płynąć)")
-    print("   3. Naciśnij Enter → META/STOP (czas się zatrzymuje)")
-    print("   4. Wyświetlenie końcowego wyniku")
+    print("   1. Inicjalizacja tablicy + czyszczenie linii 2 (NIE linii 1!)")
+    print("   2. Wyświetlenie czasu startowego 00'00\".000")
+    print("   3. Naciśnij Enter → RE-INIT → START (czas płynie co 100ms)")
+    print("   4. Naciśnij Enter → META/STOP (czas się zatrzymuje)")
+    print("   5. Wyświetlenie końcowego wyniku + 'META'")
+    print("\n💡 Ulepszenia:")
+    print("   ✓ Nie czyścimy linii 1 (unikamy konfliktu)")
+    print("   ✓ RE-INIT przed startem timera")
+    print("   ✓ Szybsze aktualizacje (100ms zamiast 200ms)")
+    print("   ✓ Debug output co 10 aktualizacji")
 
     port = input("\nPort (Enter = COM5): ").strip() or "COM5"
 
@@ -197,7 +217,7 @@ def main():
         time.sleep(0.3)
 
         # =======================================================================
-        # KROK 1: Inicjalizacja + czyszczenie obu linii
+        # KROK 1: Inicjalizacja + czyszczenie linii 2
         # =======================================================================
         print("\n" + "="*70)
         print("KROK 1: Inicjalizacja tablicy")
@@ -205,9 +225,6 @@ def main():
 
         print("📤 Wysyłam inicjalizację 3x...")
         send_init(ser, 3)
-
-        print("📤 Czyszczę linię 1 (stara treść)...")
-        clear_line1(ser)
 
         print("📤 Czyszczę linię 2 (usuwam tekst producenta)...")
         clear_line2(ser)
@@ -230,6 +247,10 @@ def main():
 
         input("\n🏁 Naciśnij Enter aby wystartować... ")
 
+        # RE-INICJALIZACJA przed startem (tablica może potrzebować "obudzenia")
+        print("\n📤 RE-INICJALIZACJA przed startem...")
+        send_init(ser, 1)
+
         # =======================================================================
         # KROK 3: START - czas płynie
         # =======================================================================
@@ -237,7 +258,8 @@ def main():
         print("KROK 3: CZAS PŁYNIE...")
         print("="*70)
 
-        timer = Timer(ser, update_interval=0.2)  # Aktualizuj co 200ms
+        # Możesz zmienić reinit_each=True jeśli tablica nadal nie działa
+        timer = Timer(ser, update_interval=0.1, reinit_each=False)  # Aktualizuj co 100ms
         timer.start()
 
         # Czekaj na Enter (META/STOP)
