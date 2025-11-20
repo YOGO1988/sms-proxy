@@ -128,7 +128,8 @@ def create_ranking_packet(time_str: str, place: int, line: int) -> bytes:
     Properly calculates CRC (62 bytes total for META packet)
 
     Args:
-        time_str: Time like "00:07.787"
+        time_str: Time like "00:07.787" (tysięczne) lub "00:07.78" (setne)
+                  TODO - OPCJE: format zależy od ustawień programu
         place: Place number (1-99)
         line: Display line (1 or 2)
 
@@ -157,10 +158,10 @@ def create_ranking_packet(time_str: str, place: int, line: int) -> bytes:
     # Format place: "1." or "12."
     place_text = f"{place}."
 
-    # Build display text: time + space + place
+    # Build display text: place + space + time
     # META packet has 38 bytes of text (bytes 22-59)
     # Bytes 60-61 are ALWAYS 0D 0A (\r\n) - DO NOT OVERWRITE!
-    display_text = f"{formatted} {place_text}".ljust(38)[:38]
+    display_text = f"{place_text} {formatted}".ljust(38)[:38]
     base[22:60] = display_text.encode('ascii', errors='replace')
     # base[60:62] remains 0D 0A
 
@@ -422,6 +423,10 @@ class LEDDisplayManager:
     - Tryb 2-torowy (wyniki dla 2 zawodników na TOR 1 i TOR 2)
     - Tryb rankingowy (wyniki dla 3+ zawodników w parach: 1-2, 3-4, 5-6...)
     - Test timera (start/meta)
+
+    TODO - IMPLEMENTACJA DOCELOWA:
+    - Dwutorowy timer: niezależne starty i stopy dla każdego toru
+      (tory nie startują razem, zatrzymują się na swój sygnał)
     """
 
     def __init__(self, port='COM5', baudrate=9600):
@@ -511,6 +516,9 @@ class LEDDisplayManager:
             seconds = int(elapsed % 60)
             milliseconds = int((elapsed % 1) * 1000)
 
+            # TODO - OPCJE WYŚWIETLANIA: implementować wybór:
+            # - setne sekundy: .{milliseconds//10:02d} (np. 00:07.46)
+            # - tysięczne sekundy: .{milliseconds:03d} (np. 00:07.467) <- obecnie
             time_str = f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
             # Show time on line 1 (without clearing - just overwrite)
@@ -554,6 +562,8 @@ class LEDDisplayManager:
         minutes = int(final_time // 60)
         seconds = int(final_time % 60)
         milliseconds = int((final_time % 1) * 1000)
+
+        # TODO - OPCJE WYŚWIETLANIA: ta sama opcja co w _timer_worker
         time_str = f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
         print(f"🏁 META! Czas: {time_str}")
