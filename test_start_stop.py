@@ -13,6 +13,9 @@ import sys
 # Pakiet inicjalizacyjny
 INIT_PACKET = bytes.fromhex('1B 09 0A 00 A4 EB 00 00 0D 0A'.replace(' ', ''))
 
+# Pakiet czyszczący linię 1 (same spacje)
+EMPTY_LINE1 = bytes.fromhex('1B 07 3A 00 BD CA 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+
 # Pakiet czyszczący linię 2 (usuwa tekst producenta)
 EMPTY_LINE2 = bytes.fromhex('1B 07 54 00 60 FC 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 2D 2D 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
 
@@ -105,6 +108,13 @@ def send_init(ser, count=3):
     time.sleep(0.3)
 
 
+def clear_line1(ser):
+    """Czyści linię 1 (same spacje)"""
+    ser.write(EMPTY_LINE1)
+    ser.flush()
+    time.sleep(0.3)
+
+
 def clear_line2(ser):
     """Czyści linię 2 (usuwa tekst producenta)"""
     ser.write(EMPTY_LINE2)
@@ -149,8 +159,6 @@ class Timer:
 
             # Wyślij na wyświetlacz
             try:
-                # IMPORTANT: Re-init przed każdym nowym pakietem!
-                send_init(self.ser, 1)
                 packet = create_time_packet(time_str)
                 self.ser.write(packet)
                 self.ser.flush()
@@ -189,7 +197,7 @@ def main():
         time.sleep(0.3)
 
         # =======================================================================
-        # KROK 1: Inicjalizacja + czyszczenie linii 2
+        # KROK 1: Inicjalizacja + czyszczenie obu linii
         # =======================================================================
         print("\n" + "="*70)
         print("KROK 1: Inicjalizacja tablicy")
@@ -197,6 +205,9 @@ def main():
 
         print("📤 Wysyłam inicjalizację 3x...")
         send_init(ser, 3)
+
+        print("📤 Czyszczę linię 1 (stara treść)...")
+        clear_line1(ser)
 
         print("📤 Czyszczę linię 2 (usuwam tekst producenta)...")
         clear_line2(ser)
@@ -212,11 +223,10 @@ def main():
 
         # Wyświetl początkowy czas 00'00".000
         print("📤 Wyświetlam czas startowy: 00'00\".000")
-        send_init(ser, 1)
         start_packet = create_time_packet("00'00\".000")
         ser.write(start_packet)
         ser.flush()
-        time.sleep(0.3)
+        time.sleep(0.5)
 
         input("\n🏁 Naciśnij Enter aby wystartować... ")
 
@@ -247,7 +257,6 @@ def main():
 
         # Wyślij końcowy czas na wyświetlacz (z dodatkowym "META")
         print("📤 Wysyłam końcowy wynik...")
-        send_init(ser, 1)
         final_packet = create_time_packet(f"{final_time_str} META")
         ser.write(final_packet)
         ser.flush()
