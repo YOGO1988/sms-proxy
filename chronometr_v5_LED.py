@@ -1992,7 +1992,8 @@ class ChronometerManager:
             self.osf_manage_btn.config(state='normal')
             self.update_display("⏱️ START!\nOczekiwanie na mety...")
 
-        elif channel == 3 and self.race_in_progress:
+        elif channel == 4 and self.race_in_progress:
+            # KANAŁ 4 = TOR 1 = LINIA 1
             if self.start_time is not None:
                 result_time = time.time() - self.start_absolute_time
 
@@ -2010,14 +2011,14 @@ class ChronometerManager:
                     self.measurements.append({
                         'race': self.race_number,
                         'mode': "OSF - DWA TORY",
-                        'lane': "LEWY",
+                        'lane': "TOR 1",
                         'time': result_time,
                         'timestamp': timestamp
                     })
                     self.history_tree.insert('', 0, values=(
                         self.race_number,
                         "OSF - DWA TORY",
-                        "LEWY",
+                        "TOR 1",
                         self.format_time(result_time),
                         timestamp
                     ), tags=('race',))
@@ -2027,11 +2028,12 @@ class ChronometerManager:
                         result_str = self.format_time_mmss(result_time)
                         packet1 = create_finish_packet_line1(result_str)
                         self.led_manager.display.send_packet(packet1, delay=0)
-                        print(f"📺 LED: LEWY TOR zakończony - result_time={result_time:.4f}s, formatted={result_str}")
+                        print(f"📺 LED: TOR 1 (kanał 4) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
                 self.update_osf_display()
 
-        elif channel == 4 and self.race_in_progress:
+        elif channel == 3 and self.race_in_progress:
+            # KANAŁ 3 = TOR 2 = LINIA 2
             if self.start_time is not None:
                 result_time = time.time() - self.start_absolute_time
 
@@ -2049,14 +2051,14 @@ class ChronometerManager:
                     self.measurements.append({
                         'race': self.race_number,
                         'mode': "OSF - DWA TORY",
-                        'lane': "PRAWY",
+                        'lane': "TOR 2",
                         'time': result_time,
                         'timestamp': timestamp
                     })
                     self.history_tree.insert('', 0, values=(
                         self.race_number,
                         "OSF - DWA TORY",
-                        "PRAWY",
+                        "TOR 2",
                         self.format_time(result_time),
                         timestamp
                     ), tags=('race',))
@@ -2066,7 +2068,7 @@ class ChronometerManager:
                         result_str = self.format_time_mmss(result_time)
                         packet2 = create_finish_packet_line2(result_str)
                         self.led_manager.display.send_packet(packet2, delay=0)
-                        print(f"📺 LED: PRAWY TOR zakończony - result_time={result_time:.4f}s, formatted={result_str}")
+                        print(f"📺 LED: TOR 2 (kanał 3) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
                 self.update_osf_display()
 
@@ -2078,14 +2080,14 @@ class ChronometerManager:
         display = f"🏁 OSF - BIEG #{self.race_number}\n\n"
 
         if self.left_lane_result is not None:
-            display += f"✅ Tor LEWY:  {self.format_time(self.left_lane_result)} s\n"
+            display += f"✅ TOR 1:  {self.format_time(self.left_lane_result)} s\n"
         else:
-            display += f"⏳ Tor LEWY:  czekam...\n"
+            display += f"⏳ TOR 1:  czekam...\n"
 
         if self.right_lane_result is not None:
-            display += f"✅ Tor PRAWY: {self.format_time(self.right_lane_result)} s"
+            display += f"✅ TOR 2: {self.format_time(self.right_lane_result)} s"
         else:
-            display += f"⏳ Tor PRAWY: czekam..."
+            display += f"⏳ TOR 2: czekam..."
 
         self.update_display(display)
 
@@ -2127,7 +2129,8 @@ class ChronometerManager:
             self.osf_manage_btn.config(state='normal')
             self.update_display("⏱️ START!\nLiczenie do 5 zawodników...")
 
-        elif channel == 3 and self.race_in_progress:
+        elif channel == 4 and self.race_in_progress:
+            # KANAŁ 4 = TOR 1 = LINIA 1
             if self.start_time is not None:
                 crossing_time = time.time() - self.start_absolute_time
 
@@ -2138,7 +2141,8 @@ class ChronometerManager:
                     self.left_lane_crossings.append(crossing_time)
                     self.update_druzyna_display()
 
-        elif channel == 4 and self.race_in_progress:
+        elif channel == 3 and self.race_in_progress:
+            # KANAŁ 3 = TOR 2 = LINIA 2
             if self.start_time is not None:
                 crossing_time = time.time() - self.start_absolute_time
 
@@ -2155,15 +2159,15 @@ class ChronometerManager:
 
         if len(self.left_lane_crossings) == 5:
             left_time = self.left_lane_crossings[-1]
-            display += f"✅ Tor LEWY: {self.format_time(left_time)} s\n"
+            display += f"✅ TOR 1: {self.format_time(left_time)} s\n"
         else:
-            display += f"⏳ Tor LEWY: {len(self.left_lane_crossings)}/5 zawodników\n"
+            display += f"⏳ TOR 1: {len(self.left_lane_crossings)}/5 zawodników\n"
 
         if len(self.right_lane_crossings) == 5:
             right_time = self.right_lane_crossings[-1]
-            display += f"✅ Tor PRAWY: {self.format_time(right_time)} s"
+            display += f"✅ TOR 2: {self.format_time(right_time)} s"
         else:
-            display += f"⏳ Tor PRAWY: {len(self.right_lane_crossings)}/5 zawodników"
+            display += f"⏳ TOR 2: {len(self.right_lane_crossings)}/5 zawodników"
 
         self.update_display(display)
 
@@ -2179,14 +2183,14 @@ class ChronometerManager:
             self.measurements.append({
                 'race': self.race_number,
                 'mode': "OSF DRUŻYNA",
-                'lane': "LEWY (5 os.)",
+                'lane': "TOR 1 (5 os.)",
                 'time': left_time,
                 'timestamp': timestamp
             })
             self.history_tree.insert('', 0, values=(
                 self.race_number,
                 "OSF DRUŻYNA",
-                "LEWY (5 os.)",
+                "TOR 1 (5 os.)",
                 self.format_time(left_time),
                 timestamp
             ), tags=('race',))
@@ -2196,7 +2200,7 @@ class ChronometerManager:
                 result_str = self.format_time_mmss(left_time)
                 packet1 = create_finish_packet_line1(result_str)
                 self.led_manager.display.send_packet(packet1, delay=0)
-                print(f"📺 LED: LEWY TOR (DRUŻYNA) zakończony - result_time={left_time:.4f}s, formatted={result_str}")
+                print(f"📺 LED: TOR 1 (DRUŻYNA, kanał 4) zakończony - result_time={left_time:.4f}s, formatted={result_str}")
 
         if len(self.right_lane_crossings) == 5 and self.right_lane_result is None:
             right_time = self.right_lane_crossings[-1]
@@ -2210,14 +2214,14 @@ class ChronometerManager:
             self.measurements.append({
                 'race': self.race_number,
                 'mode': "OSF DRUŻYNA",
-                'lane': "PRAWY (5 os.)",
+                'lane': "TOR 2 (5 os.)",
                 'time': right_time,
                 'timestamp': timestamp
             })
             self.history_tree.insert('', 0, values=(
                 self.race_number,
                 "OSF DRUŻYNA",
-                "PRAWY (5 os.)",
+                "TOR 2 (5 os.)",
                 self.format_time(right_time),
                 timestamp
             ), tags=('race',))
@@ -2227,7 +2231,7 @@ class ChronometerManager:
                 result_str = self.format_time_mmss(right_time)
                 packet2 = create_finish_packet_line2(result_str)
                 self.led_manager.display.send_packet(packet2, delay=0)
-                print(f"📺 LED: PRAWY TOR (DRUŻYNA) zakończony - result_time={right_time:.4f}s, formatted={result_str}")
+                print(f"📺 LED: TOR 2 (DRUŻYNA, kanał 3) zakończony - result_time={right_time:.4f}s, formatted={result_str}")
 
         if len(self.left_lane_crossings) == 5 and len(self.right_lane_crossings) == 5:
             self.timer_running = False
@@ -2285,12 +2289,14 @@ class ChronometerManager:
 
                 is_blocked = self.osf_block_var.get()
 
-                if channel == 3:
+                if channel == 4:
+                    # KANAŁ 4 = TOR 1 = LINIA 1
                     self.osf_all_left_crossings.append((crossing_time, is_blocked))
 
                     if not is_blocked and len(self.left_lane_crossings) < 13:
                         self.left_lane_crossings.append(crossing_time)
                 else:
+                    # KANAŁ 3 = TOR 2 = LINIA 2
                     self.osf_all_right_crossings.append((crossing_time, is_blocked))
 
                     if not is_blocked and len(self.right_lane_crossings) < 13:
@@ -2304,15 +2310,15 @@ class ChronometerManager:
 
         if len(self.left_lane_crossings) == 13:
             left_time = self.left_lane_crossings[-1]
-            display += f"✅ Tor LEWY:  {self.format_time(left_time)} s ({len(self.left_lane_crossings)}/13)\n"
+            display += f"✅ TOR 1:  {self.format_time(left_time)} s ({len(self.left_lane_crossings)}/13)\n"
         else:
-            display += f"⏳ Tor LEWY:  {len(self.left_lane_crossings)}/13 przecięć\n"
+            display += f"⏳ TOR 1:  {len(self.left_lane_crossings)}/13 przecięć\n"
 
         if len(self.right_lane_crossings) == 13:
             right_time = self.right_lane_crossings[-1]
-            display += f"✅ Tor PRAWY: {self.format_time(right_time)} s ({len(self.right_lane_crossings)}/13)"
+            display += f"✅ TOR 2: {self.format_time(right_time)} s ({len(self.right_lane_crossings)}/13)"
         else:
-            display += f"⏳ Tor PRAWY: {len(self.right_lane_crossings)}/13 przecięć"
+            display += f"⏳ TOR 2: {len(self.right_lane_crossings)}/13 przecięć"
 
         self.update_display(display)
 
@@ -2328,14 +2334,14 @@ class ChronometerManager:
             self.measurements.append({
                 'race': self.race_number,
                 'mode': "WACHADŁO",
-                'lane': "LEWY",
+                'lane': "TOR 1",
                 'time': left_time,
                 'timestamp': timestamp
             })
             self.history_tree.insert('', 0, values=(
                 self.race_number,
                 "WACHADŁO",
-                "LEWY",
+                "TOR 1",
                 self.format_time(left_time),
                 timestamp
             ), tags=('race',))
@@ -2345,7 +2351,7 @@ class ChronometerManager:
                 result_str = self.format_time_mmss(left_time)
                 packet1 = create_finish_packet_line1(result_str)
                 self.led_manager.display.send_packet(packet1, delay=0)
-                print(f"📺 LED: LEWY TOR (WACHADŁO) zakończony - result_time={left_time:.4f}s, formatted={result_str}")
+                print(f"📺 LED: TOR 1 (WACHADŁO, kanał 4) zakończony - result_time={left_time:.4f}s, formatted={result_str}")
 
         if len(self.right_lane_crossings) == 13 and self.right_lane_result is None:
             right_time = self.right_lane_crossings[-1]
@@ -2359,14 +2365,14 @@ class ChronometerManager:
             self.measurements.append({
                 'race': self.race_number,
                 'mode': "WACHADŁO",
-                'lane': "PRAWY",
+                'lane': "TOR 2",
                 'time': right_time,
                 'timestamp': timestamp
             })
             self.history_tree.insert('', 0, values=(
                 self.race_number,
                 "WACHADŁO",
-                "PRAWY",
+                "TOR 2",
                 self.format_time(right_time),
                 timestamp
             ), tags=('race',))
@@ -2376,7 +2382,7 @@ class ChronometerManager:
                 result_str = self.format_time_mmss(right_time)
                 packet2 = create_finish_packet_line2(result_str)
                 self.led_manager.display.send_packet(packet2, delay=0)
-                print(f"📺 LED: PRAWY TOR (WACHADŁO) zakończony - result_time={right_time:.4f}s, formatted={result_str}")
+                print(f"📺 LED: TOR 2 (WACHADŁO, kanał 3) zakończony - result_time={right_time:.4f}s, formatted={result_str}")
 
         if len(self.left_lane_crossings) == 13 and len(self.right_lane_crossings) == 13:
             self.timer_running = False
@@ -2698,8 +2704,9 @@ class ChronometerManager:
 
         elif "DWA TORY" in mode_text:
             if not self.left_lane_finished and not self.right_lane_finished:
-                lane = messagebox.askquestion("Który?", "Lewy (TAK) / Prawy (NIE)?")
+                lane = messagebox.askquestion("Który?", "TOR 1 (TAK) / TOR 2 (NIE)?")
                 if lane == 'yes':
+                    # TOR 1 (left_lane)
                     # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
                     self.left_lane_result = result_time
                     self.left_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
@@ -2713,14 +2720,14 @@ class ChronometerManager:
                     self.measurements.append({
                         'race': self.race_number,
                         'mode': "OSF - DWA TORY (RĘCZ)",
-                        'lane': "LEWY",
+                        'lane': "TOR 1",
                         'time': result_time,
                         'timestamp': timestamp
                     })
                     self.history_tree.insert('', 0, values=(
                         self.race_number,
                         "OSF - DWA TORY (RĘCZ)",
-                        "LEWY",
+                        "TOR 1",
                         self.format_time(result_time),
                         timestamp
                     ), tags=('race',))
@@ -2730,8 +2737,9 @@ class ChronometerManager:
                         result_str = self.format_time_mmss(result_time)
                         packet1 = create_finish_packet_line1(result_str)
                         self.led_manager.display.send_packet(packet1, delay=0)
-                        print(f"📺 LED: LEWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
+                        print(f"📺 LED: TOR 1 (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
                 else:
+                    # TOR 2 (right_lane)
                     # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
                     self.right_lane_result = result_time
                     self.right_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
@@ -2745,14 +2753,14 @@ class ChronometerManager:
                     self.measurements.append({
                         'race': self.race_number,
                         'mode': "OSF - DWA TORY (RĘCZ)",
-                        'lane': "PRAWY",
+                        'lane': "TOR 2",
                         'time': result_time,
                         'timestamp': timestamp
                     })
                     self.history_tree.insert('', 0, values=(
                         self.race_number,
                         "OSF - DWA TORY (RĘCZ)",
-                        "PRAWY",
+                        "TOR 2",
                         self.format_time(result_time),
                         timestamp
                     ), tags=('race',))
@@ -2762,11 +2770,12 @@ class ChronometerManager:
                         result_str = self.format_time_mmss(result_time)
                         packet2 = create_finish_packet_line2(result_str)
                         self.led_manager.display.send_packet(packet2, delay=0)
-                        print(f"📺 LED: PRAWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
+                        print(f"📺 LED: TOR 2 (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
                 self.update_osf_display()
 
             elif self.left_lane_finished and not self.right_lane_finished:
+                # TOR 2 (right_lane) - drugi do końca
                 # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
                 self.right_lane_result = result_time
                 self.right_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
@@ -2780,14 +2789,14 @@ class ChronometerManager:
                 self.measurements.append({
                     'race': self.race_number,
                     'mode': "OSF - DWA TORY (RĘCZ)",
-                    'lane': "PRAWY",
+                    'lane': "TOR 2",
                     'time': result_time,
                     'timestamp': timestamp
                 })
                 self.history_tree.insert('', 0, values=(
                     self.race_number,
                     "OSF - DWA TORY (RĘCZ)",
-                    "PRAWY",
+                    "TOR 2",
                     self.format_time(result_time),
                     timestamp
                 ), tags=('race',))
@@ -2797,11 +2806,12 @@ class ChronometerManager:
                     result_str = self.format_time_mmss(result_time)
                     packet2 = create_finish_packet_line2(result_str)
                     self.led_manager.display.send_packet(packet2, delay=0)
-                    print(f"📺 LED: PRAWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
+                    print(f"📺 LED: TOR 2 (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
                 self.update_osf_display()
 
             elif not self.left_lane_finished and self.right_lane_finished:
+                # TOR 1 (left_lane) - drugi do końca
                 # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
                 self.left_lane_result = result_time
                 self.left_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
@@ -2815,14 +2825,14 @@ class ChronometerManager:
                 self.measurements.append({
                     'race': self.race_number,
                     'mode': "OSF - DWA TORY (RĘCZ)",
-                    'lane': "LEWY",
+                    'lane': "TOR 1",
                     'time': result_time,
                     'timestamp': timestamp
                 })
                 self.history_tree.insert('', 0, values=(
                     self.race_number,
                     "OSF - DWA TORY (RĘCZ)",
-                    "LEWY",
+                    "TOR 1",
                     self.format_time(result_time),
                     timestamp
                 ), tags=('race',))
@@ -2832,7 +2842,7 @@ class ChronometerManager:
                     result_str = self.format_time_mmss(result_time)
                     packet1 = create_finish_packet_line1(result_str)
                     self.led_manager.display.send_packet(packet1, delay=0)
-                    print(f"📺 LED: LEWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
+                    print(f"📺 LED: TOR 1 (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
                 self.update_osf_display()
 
