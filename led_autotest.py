@@ -11,6 +11,23 @@ import time
 from datetime import datetime
 import sys
 
+# ============================================================================
+# REAL PROTOCOL PACKETS - Verified from working chronometer program
+# ============================================================================
+REAL_PACKETS = {
+    'name_tymon': bytes.fromhex('1B 07 52 00 AA C2 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 54 79 6D 6F 6E 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 2D 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', '')),
+
+    'lane1': bytes.fromhex('1B 08 E8 00 E8 71 00 00 01 00 00 00 00 00 00 00 01 00 0A 00 00 00 00 00 00 00 00 00 5B 00 54 4F 52 20 31 20 20 20 30 29 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0D 0A'.replace(' ', '')),
+
+    'lane2': bytes.fromhex('1B 08 E8 00 F8 77 00 00 01 00 00 00 00 00 00 00 02 00 0A 00 00 00 10 00 00 00 00 00 38 00 54 4F 52 20 32 20 20 20 30 29 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0D 0A'.replace(' ', '')),
+
+    'time_7sec': bytes.fromhex('1B 07 3A 00 51 8B 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 37 22 2E 34 36 37 20 20 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', '')),
+
+    'time_7sec_tor1': bytes.fromhex('1B 07 3E 00 A1 2A 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 37 22 2E 37 38 37 20 54 4F 52 20 31 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', '')),
+
+    'time_10sec_tor2': bytes.fromhex('1B 07 3E 00 8F 5C 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 30 30 27 31 30 22 2E 33 36 32 20 54 4F 52 20 32 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', '')),
+}
+
 def find_ports():
     """Znajduje dostępne porty COM"""
     ports = serial.tools.list_ports.comports()
@@ -110,6 +127,135 @@ def test_hex_commands(port, baudrate):
                 print("⚫ Brak odpowiedzi")
 
         ser.close()
+        return True
+
+    except Exception as e:
+        print(f"❌ BŁĄD: {str(e)}")
+        return False
+
+def test_real_protocol(port, baudrate, log_file):
+    """Testuje rzeczywiste pakiety protokołu tablicy LED"""
+    print(f"\n{'='*60}")
+    print(f"TEST RZECZYWISTEGO PROTOKOŁU")
+    print(f"Port: {port} @ {baudrate} baud")
+    print(f"{'='*60}")
+
+    test_sequences = [
+        {
+            'name': 'Nazwa wydarzenia',
+            'packets': ['name_tymon'],
+            'wait': 3.0,
+            'description': 'Wyświetla "Tymon --"'
+        },
+        {
+            'name': 'Etykiety torów',
+            'packets': ['lane1', 'lane2'],
+            'wait': 2.0,
+            'description': 'Wyświetla "TOR 1    0)" i "TOR 2    0)"'
+        },
+        {
+            'name': 'Pojedynczy czas (bez toru)',
+            'packets': ['time_7sec'],
+            'wait': 3.0,
+            'description': 'Wyświetla "00\'07".467  -"'
+        },
+        {
+            'name': 'Czas na TOR 1',
+            'packets': ['time_7sec_tor1'],
+            'wait': 3.0,
+            'description': 'Wyświetla "00\'07".787 TOR 1"'
+        },
+        {
+            'name': 'Czas na TOR 2',
+            'packets': ['time_10sec_tor2'],
+            'wait': 3.0,
+            'description': 'Wyświetla "00\'10".362 TOR 2"'
+        },
+        {
+            'name': 'Oba czasy (TOR 1 i TOR 2)',
+            'packets': ['time_7sec_tor1', 'time_10sec_tor2'],
+            'wait': 4.0,
+            'description': 'Wyświetla oba czasy naraz (2 linie)'
+        },
+        {
+            'name': 'Pełna sekwencja biegu',
+            'packets': ['lane1', 'lane2', 'time_7sec_tor1', 'time_10sec_tor2'],
+            'wait': 5.0,
+            'description': 'Etykiety torów → czasy wyników'
+        },
+    ]
+
+    try:
+        ser = serial.Serial(
+            port=port,
+            baudrate=baudrate,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=2
+        )
+
+        print(f"✅ Port otwarty")
+        print(f"\nWysyłam sekwencje testowe...")
+        print(f"Obserwuj tablicę LED!\n")
+
+        with open(log_file, 'a', encoding='utf-8') as log:
+            log.write(f"\n{'='*60}\n")
+            log.write(f"REAL PROTOCOL TEST: {baudrate} baud\n")
+            log.write(f"Start: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            log.write(f"{'='*60}\n\n")
+
+            for i, test in enumerate(test_sequences, 1):
+                print(f"\n{'─'*60}")
+                print(f"TEST {i}/{len(test_sequences)}: {test['name']}")
+                print(f"Opis: {test['description']}")
+                print(f"{'─'*60}")
+
+                log.write(f"\n--- TEST {i}: {test['name']} ---\n")
+                log.write(f"Description: {test['description']}\n")
+
+                for packet_name in test['packets']:
+                    packet = REAL_PACKETS.get(packet_name)
+                    if packet:
+                        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                        print(f"📤 [{timestamp}] Wysyłam: {packet_name}")
+                        print(f"   HEX: {packet.hex(' ')[:60]}...")
+                        print(f"   Długość: {len(packet)} bajtów")
+
+                        ser.write(packet)
+                        ser.flush()
+
+                        log.write(f"[{timestamp}] TX: {packet_name}\n")
+                        log.write(f"HEX: {packet.hex(' ')}\n")
+
+                        # Czekaj między pakietami
+                        time.sleep(0.3)
+
+                        # Sprawdź odpowiedź
+                        if ser.in_waiting > 0:
+                            response = ser.read(ser.in_waiting)
+                            print(f"📥 ODPOWIEDŹ: {response.hex(' ')}")
+                            log.write(f"RX: {response.hex(' ')}\n")
+
+                print(f"\n⏱️  Czekam {test['wait']}s aby zobaczyć efekt...")
+                time.sleep(test['wait'])
+
+                log.write(f"Wait: {test['wait']}s\n")
+
+                # Pytanie użytkownika
+                choice = input("\nCzy tablica wyświetliła poprawnie? (t/n/przerwij): ").lower()
+                log.write(f"User response: {choice}\n")
+
+                if choice == 'przerwij':
+                    print("\n⏸️  Test przerwany przez użytkownika")
+                    break
+                elif choice == 't':
+                    print("✅ Świetnie!")
+                elif choice == 'n':
+                    print("❌ Zanotowane - sprawdzę to")
+
+        ser.close()
+        print(f"\n✅ Test zakończony")
         return True
 
     except Exception as e:
@@ -440,20 +586,62 @@ def main():
     # Zapytaj czy chcemy tryb automatyczny czy od razu interaktywny
     print("\n" + "=" * 60)
     print("WYBÓR TRYBU:")
-    print("  1. Automatyczne testy wszystkich baudrate (zalecane)")
-    print("  2. Tryb interaktywny (jeśli znasz baudrate)")
+    print("  1. Test rzeczywistego protokołu (ZALECANE - zweryfikowane pakiety)")
+    print("  2. Automatyczne testy wszystkich baudrate (ogólne testy)")
+    print("  3. Tryb interaktywny (jeśli znasz baudrate)")
     print("=" * 60)
 
-    mode_choice = input("\nWybór (1-2): ").strip()
+    mode_choice = input("\nWybór (1-3): ").strip()
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = f"LED_AutoTest_{timestamp}.txt"
     print(f"\n💾 Zapisuję logi do: {log_file}")
 
-    if mode_choice == '2':
+    if mode_choice == '1':
+        # Test rzeczywistego protokołu
+        print("\n" + "=" * 60)
+        print("TEST RZECZYWISTEGO PROTOKOŁU")
+        print("=" * 60)
+        print("\nWysyłam zweryfikowane pakiety z oryginalnego programu chronometru")
+        print("Te pakiety DZIAŁAJĄ - zostały rozkodowane z działającego systemu!\n")
+
+        # Wybór baudrate
+        print("📍 Który baudrate chcesz przetestować?")
+        print("   1. 9600 (najpopularniejszy dla tablic LED)")
+        print("   2. 19200")
+        print("   3. 38400")
+        print("   4. Przetestuj wszystkie po kolei")
+
+        baud_choice = input("\nWybór (1-4): ").strip()
+
+        baudrates_map = {
+            '1': [9600],
+            '2': [19200],
+            '3': [38400],
+            '4': [9600, 19200, 38400, 57600, 115200]
+        }
+
+        baudrates_to_test = baudrates_map.get(baud_choice, [9600])
+
+        input("\n⚠️  UWAGA: Upewnij się że tablica LED jest WŁĄCZONA!\nNaciśnij Enter aby kontynuować...")
+
+        for baudrate in baudrates_to_test:
+            print(f"\n{'#'*60}")
+            print(f"TESTUJĘ BAUDRATE: {baudrate}")
+            print(f"{'#'*60}")
+
+            test_real_protocol(port, baudrate, log_file)
+
+            if len(baudrates_to_test) > 1:
+                choice = input("\nChcesz przetestować następny baudrate? (t/n): ").lower()
+                if choice != 't':
+                    break
+
+    elif mode_choice == '3':
         # Bezpośrednio do trybu interaktywnego
         interactive_mode(port, log_file)
-    else:
+
+    elif mode_choice == '2':
         # Standardowe testy automatyczne
         baudrates = [9600, 19200, 38400, 57600, 115200]
 
