@@ -376,14 +376,9 @@ class LEDDisplay:
             place: Place number (1, 2, 3, 4, ...)
             line: Display line (1 or 2)
         """
-        # TEMPORARY: Use original packets to debug
-        # If this works, checksum is the issue
-        if line == 1:
-            print(f"   [DEBUG] Wysyłam pakiet TOR 1 (zamiast miejsca {place})")
-            return self.send_packet('time_7sec_tor1')
-        else:
-            print(f"   [DEBUG] Wysyłam pakiet TOR 2 (zamiast miejsca {place})")
-            return self.send_packet('time_10sec_tor2')
+        # Create ranking packet with place number
+        packet = create_ranking_packet(time_str, place, line)
+        return self.send_packet(packet)
 
 
 class LEDDisplayManager:
