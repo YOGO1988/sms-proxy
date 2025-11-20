@@ -1926,9 +1926,11 @@ class ChronometerManager:
                 self.osf_all_left_crossings.append((result_time, is_blocked))
 
                 if not is_blocked and len(self.left_lane_crossings) < 1:
-                    self.left_lane_crossings.append(result_time)
+                    # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
                     self.left_lane_result = result_time
-                    self.left_lane_finished = True
+                    self.left_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
+
+                    self.left_lane_crossings.append(result_time)
 
                     timestamp = datetime.now().strftime("%H:%M:%S")
                     self.measurements.append({
@@ -1951,7 +1953,7 @@ class ChronometerManager:
                         result_str = self.format_time_mmss(result_time)
                         packet1 = create_time_packet_line1(result_str, add_dash=True)
                         self.led_manager.display.send_packet(packet1, delay=0)
-                        print(f"📺 LED: LEWY TOR zakończony - {result_str}")
+                        print(f"📺 LED: LEWY TOR zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
                 self.update_osf_display()
 
@@ -1963,9 +1965,11 @@ class ChronometerManager:
                 self.osf_all_right_crossings.append((result_time, is_blocked))
 
                 if not is_blocked and len(self.right_lane_crossings) < 1:
-                    self.right_lane_crossings.append(result_time)
+                    # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
                     self.right_lane_result = result_time
-                    self.right_lane_finished = True
+                    self.right_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
+
+                    self.right_lane_crossings.append(result_time)
 
                     timestamp = datetime.now().strftime("%H:%M:%S")
                     self.measurements.append({
@@ -1988,7 +1992,7 @@ class ChronometerManager:
                         result_str = self.format_time_mmss(result_time)
                         packet2 = create_time_packet_line2(result_str, add_dash=True)
                         self.led_manager.display.send_packet(packet2, delay=0)
-                        print(f"📺 LED: PRAWY TOR zakończony - {result_str}")
+                        print(f"📺 LED: PRAWY TOR zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
                 self.update_osf_display()
 
@@ -2357,6 +2361,14 @@ class ChronometerManager:
 
         self.last_crossing_time = {1: 0, 3: 0, 4: 0}
 
+        # DEBUG: reset debug flags
+        if hasattr(self, '_debug_left_done'):
+            delattr(self, '_debug_left_done')
+        if hasattr(self, '_debug_right_done'):
+            delattr(self, '_debug_right_done')
+        if hasattr(self, '_debug_last_log_time'):
+            delattr(self, '_debug_last_log_time')
+
         self.next_race_btn.config(state='disabled')
 
         # RESETUJ TIMER NA EKRANIE GUI
@@ -2407,8 +2419,16 @@ class ChronometerManager:
             elapsed = time.time() - self.start_absolute_time
             time_str_formatted = self.format_time_mmss(elapsed)
 
-            # Aktualizuj GUI
+            # Aktualizuj GUI - TEN SAM czas co LED!
             self.timer_label.config(text=time_str_formatted, fg='#4CAF50')
+
+            # DEBUG: Loguj różnicę czasu (usuń po testach)
+            if hasattr(self, '_debug_last_log_time'):
+                if elapsed - self._debug_last_log_time > 5.0:  # Log co 5 sekund
+                    print(f"⏱️  DEBUG: elapsed={elapsed:.3f}s, formatted={time_str_formatted}, L_finished={self.left_lane_finished}, R_finished={self.right_lane_finished}")
+                    self._debug_last_log_time = elapsed
+            else:
+                self._debug_last_log_time = 0
 
             # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (OSF) ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
@@ -2419,25 +2439,32 @@ class ChronometerManager:
 
                     # === LINIA 1 (TOR LEWY) ===
                     if self.left_lane_finished and self.left_lane_result is not None:
-                        # Tor lewy SKOŃCZYŁ - pokaż WYNIK z myślnikiem
+                        # Tor lewy SKOŃCZYŁ - pokaż WYNIK z myślnikiem (NIE aktualizuj!)
                         left_time_str = self.format_time_mmss(self.left_lane_result)
                         packet1 = create_time_packet_line1(left_time_str, add_dash=True)
+                        # DEBUG: loguj tylko raz
+                        if not hasattr(self, '_debug_left_done'):
+                            print(f"📺 DEBUG LED L1: TOR LEWY SKOŃCZYŁ - wynik={left_time_str} (ZAMROŻONY)")
+                            self._debug_left_done = True
                     else:
-                        # Tor lewy BIEGA - pokaż BIEGNĄCY CZAS (zsynchronizowany)
+                        # Tor lewy BIEGA - pokaż BIEGNĄCY CZAS (zsynchronizowany z GUI!)
                         packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
 
                     # === LINIA 2 (TOR PRAWY) ===
                     if self.right_lane_finished and self.right_lane_result is not None:
-                        # Tor prawy SKOŃCZYŁ - pokaż WYNIK z myślnikiem
+                        # Tor prawy SKOŃCZYŁ - pokaż WYNIK z myślnikiem (NIE aktualizuj!)
                         right_time_str = self.format_time_mmss(self.right_lane_result)
                         packet2 = create_time_packet_line2(right_time_str, add_dash=True)
+                        # DEBUG: loguj tylko raz
+                        if not hasattr(self, '_debug_right_done'):
+                            print(f"📺 DEBUG LED L2: TOR PRAWY SKOŃCZYŁ - wynik={right_time_str} (ZAMROŻONY)")
+                            self._debug_right_done = True
                     else:
-                        # Tor prawy BIEGA - pokaż BIEGNĄCY CZAS (zsynchronizowany)
+                        # Tor prawy BIEGA - pokaż BIEGNĄCY CZAS (zsynchronizowany z GUI!)
                         packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
 
-                    # WYŚLIJ PAKIETY SZYBKO BEZ BLOKOWANIA
-                    self.led_manager.display.send_packet(packet1, delay=0)
-                    time.sleep(0.02)  # Minimalne opóźnienie między pakietami
+                    # WYŚLIJ PAKIETY BEZ BLOKOWANIA - opóźnienie w send_packet
+                    self.led_manager.display.send_packet(packet1, delay=0.02)
                     self.led_manager.display.send_packet(packet2, delay=0)
 
                 else:
@@ -2462,10 +2489,9 @@ class ChronometerManager:
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                 # Wyświetl na obu liniach dla lepszej widoczności
                 packet = create_time_packet_line1(time_str_la)
-                self.led_manager.display.send_packet(packet, delay=0)
+                self.led_manager.display.send_packet(packet, delay=0.02 if self.la_num_athletes >= 2 else 0)
 
                 if self.la_num_athletes >= 2:
-                    time.sleep(0.02)  # Minimalne opóźnienie między pakietami
                     packet2 = create_time_packet_line2(time_str_la)
                     self.led_manager.display.send_packet(packet2, delay=0)
         else:
