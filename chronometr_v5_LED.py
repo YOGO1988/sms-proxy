@@ -2025,7 +2025,7 @@ class ChronometerManager:
                     # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 1 ===
                     if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                         result_str = self.format_time_mmss(result_time)
-                        packet1 = create_time_packet_line1(result_str, add_dash=True)
+                        packet1 = create_finish_packet_line1(result_str)
                         self.led_manager.display.send_packet(packet1, delay=0)
                         print(f"📺 LED: LEWY TOR zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
@@ -2064,7 +2064,7 @@ class ChronometerManager:
                     # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 2 ===
                     if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                         result_str = self.format_time_mmss(result_time)
-                        packet2 = create_time_packet_line2(result_str, add_dash=True)
+                        packet2 = create_finish_packet_line2(result_str)
                         self.led_manager.display.send_packet(packet2, delay=0)
                         print(f"📺 LED: PRAWY TOR zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
@@ -2194,7 +2194,7 @@ class ChronometerManager:
             # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 1 ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                 result_str = self.format_time_mmss(left_time)
-                packet1 = create_time_packet_line1(result_str, add_dash=True)
+                packet1 = create_finish_packet_line1(result_str)
                 self.led_manager.display.send_packet(packet1, delay=0)
                 print(f"📺 LED: LEWY TOR (DRUŻYNA) zakończony - result_time={left_time:.4f}s, formatted={result_str}")
 
@@ -2225,7 +2225,7 @@ class ChronometerManager:
             # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 2 ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                 result_str = self.format_time_mmss(right_time)
-                packet2 = create_time_packet_line2(result_str, add_dash=True)
+                packet2 = create_finish_packet_line2(result_str)
                 self.led_manager.display.send_packet(packet2, delay=0)
                 print(f"📺 LED: PRAWY TOR (DRUŻYNA) zakończony - result_time={right_time:.4f}s, formatted={result_str}")
 
@@ -2343,7 +2343,7 @@ class ChronometerManager:
             # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 1 ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                 result_str = self.format_time_mmss(left_time)
-                packet1 = create_time_packet_line1(result_str, add_dash=True)
+                packet1 = create_finish_packet_line1(result_str)
                 self.led_manager.display.send_packet(packet1, delay=0)
                 print(f"📺 LED: LEWY TOR (WACHADŁO) zakończony - result_time={left_time:.4f}s, formatted={result_str}")
 
@@ -2374,7 +2374,7 @@ class ChronometerManager:
             # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 2 ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                 result_str = self.format_time_mmss(right_time)
-                packet2 = create_time_packet_line2(result_str, add_dash=True)
+                packet2 = create_finish_packet_line2(result_str)
                 self.led_manager.display.send_packet(packet2, delay=0)
                 print(f"📺 LED: PRAWY TOR (WACHADŁO) zakończony - result_time={right_time:.4f}s, formatted={result_str}")
 
@@ -2530,38 +2530,16 @@ class ChronometerManager:
 
             # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (OSF) ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                # TRYBY Z DWOMA TORAMI - WSPÓLNY ZEGAR DLA OBUBIEGNĄCYCH TORÓW
+                # TRYBY Z DWOMA TORAMI - DOKŁADNIE TAKA SAMA LOGIKA JAK W LEKKOATLETYCE
                 if self.current_mode in [MeasurementMode.OSF_DWA_TORY,
                                         MeasurementMode.OSF_DRUZYNA,
                                         MeasurementMode.WACHADLO]:
+                    # PROSTA LOGIKA Z LA: wyświetl ten sam czas na obu liniach
+                    packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
+                    self.led_manager.display.send_packet(packet1, delay=0.02)
 
-                    # === LINIA 1 (TOR LEWY) ===
-                    if self.left_lane_finished and self.left_lane_result is not None:
-                        # Tor lewy SKOŃCZYŁ - wyślij pakiet finałowy z nazwą toru TYLKO RAZ
-                        if not hasattr(self, '_left_finish_sent'):
-                            left_time_str = self.format_time_mmss(self.left_lane_result)
-                            packet1 = create_finish_packet_line1(left_time_str)
-                            self.led_manager.display.send_packet(packet1, delay=0.02)
-                            self._left_finish_sent = True
-                            print(f"📺 LED: TOR LEWY SKOŃCZYŁ - {left_time_str} (pakiet finałowy wysłany)")
-                    else:
-                        # Tor lewy BIEGA - pokaż WSPÓLNY BIEGNĄCY CZAS (taki sam jak tor prawy!)
-                        packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
-                        self.led_manager.display.send_packet(packet1, delay=0.02)
-
-                    # === LINIA 2 (TOR PRAWY) ===
-                    if self.right_lane_finished and self.right_lane_result is not None:
-                        # Tor prawy SKOŃCZYŁ - wyślij pakiet finałowy z nazwą toru TYLKO RAZ
-                        if not hasattr(self, '_right_finish_sent'):
-                            right_time_str = self.format_time_mmss(self.right_lane_result)
-                            packet2 = create_finish_packet_line2(right_time_str)
-                            self.led_manager.display.send_packet(packet2, delay=0)
-                            self._right_finish_sent = True
-                            print(f"📺 LED: TOR PRAWY SKOŃCZYŁ - {right_time_str} (pakiet finałowy wysłany)")
-                    else:
-                        # Tor prawy BIEGA - pokaż WSPÓLNY BIEGNĄCY CZAS (taki sam jak tor lewy!)
-                        packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
-                        self.led_manager.display.send_packet(packet2, delay=0)
+                    packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
+                    self.led_manager.display.send_packet(packet2, delay=0)
 
                 else:
                     # TRYBY POJEDYNCZE - jeden zegar
@@ -2750,7 +2728,7 @@ class ChronometerManager:
                     # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 1 ===
                     if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                         result_str = self.format_time_mmss(result_time)
-                        packet1 = create_time_packet_line1(result_str, add_dash=True)
+                        packet1 = create_finish_packet_line1(result_str)
                         self.led_manager.display.send_packet(packet1, delay=0)
                         print(f"📺 LED: LEWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
                 else:
@@ -2782,7 +2760,7 @@ class ChronometerManager:
                     # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 2 ===
                     if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                         result_str = self.format_time_mmss(result_time)
-                        packet2 = create_time_packet_line2(result_str, add_dash=True)
+                        packet2 = create_finish_packet_line2(result_str)
                         self.led_manager.display.send_packet(packet2, delay=0)
                         print(f"📺 LED: PRAWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
@@ -2817,7 +2795,7 @@ class ChronometerManager:
                 # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 2 ===
                 if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                     result_str = self.format_time_mmss(result_time)
-                    packet2 = create_time_packet_line2(result_str, add_dash=True)
+                    packet2 = create_finish_packet_line2(result_str)
                     self.led_manager.display.send_packet(packet2, delay=0)
                     print(f"📺 LED: PRAWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
@@ -2852,7 +2830,7 @@ class ChronometerManager:
                 # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 1 ===
                 if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                     result_str = self.format_time_mmss(result_time)
-                    packet1 = create_time_packet_line1(result_str, add_dash=True)
+                    packet1 = create_finish_packet_line1(result_str)
                     self.led_manager.display.send_packet(packet1, delay=0)
                     print(f"📺 LED: LEWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
