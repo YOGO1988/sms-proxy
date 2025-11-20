@@ -167,6 +167,11 @@ class Timer:
                     self.ser.flush()
                     time.sleep(0.05)
 
+                # WAŻNE: Wyczyść linię 1 przed aktualizacją (inaczej wyświetlacz ignoruje nowy tekst)
+                self.ser.write(EMPTY_LINE1)
+                self.ser.flush()
+                time.sleep(0.05)
+
                 packet = create_time_packet(time_str)
                 self.ser.write(packet)
                 self.ser.flush()
