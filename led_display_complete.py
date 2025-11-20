@@ -22,10 +22,24 @@ import struct
 from typing import List, Tuple, Optional
 
 
+def calculate_crc16(data: bytes) -> int:
+    """CRC-16-CCITT (from test_timer_working.py)"""
+    crc = 0x0000
+    for byte in data:
+        crc ^= (byte << 8)
+        for _ in range(8):
+            if crc & 0x8000:
+                crc = (crc << 1) ^ 0x1021
+            else:
+                crc <<= 1
+            crc &= 0xFFFF
+    return crc
+
+
 def create_time_packet_line1(time_str: str) -> bytes:
     """
     Create time packet for line 1 using WORKING packet as template
-    Only modifies the time text, keeps checksum calculation from original
+    Properly calculates CRC and uses correct text length (34 bytes)
 
     Args:
         time_str: Time like "00:07.787"
@@ -33,8 +47,7 @@ def create_time_packet_line1(time_str: str) -> bytes:
     Returns:
         Packet bytes
     """
-    # Use working packet as base (time_7sec_tor1 with empty label)
-    # We'll use time_7sec packet (no TOR label) as template
+    # Use working packet as base (time_7sec packet - 58 bytes total)
     base = bytearray.fromhex('1B 07 3A 00 51 8B 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 37 22 2E 34 36 37 20 20 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
 
     # Format time: "00:07.787" -> "00'07".787"
@@ -49,19 +62,27 @@ def create_time_packet_line1(time_str: str) -> bytes:
     else:
         formatted = time_str
 
-    # Pad to match original length (11 chars for time)
-    time_text = formatted.ljust(11)[:11].encode('ascii')
+    # Pad text: "00'07".787  - " -> exactly 34 bytes (not 11!)
+    # Text starts at byte 22, ends at byte 55 (34 bytes)
+    # Bytes 56-57 are ALWAYS 0D 0A (\r\n) - DO NOT OVERWRITE!
+    text_padded = (formatted + "  - ").ljust(34)[:34]
+    base[22:56] = text_padded.encode('ascii', errors='replace')
+    # base[56:58] remains 0D 0A
 
-    # Replace time bytes (starting at byte 22)
-    base[22:22+11] = time_text
+    # Recalculate CRC (bytes 4-5)
+    base[4] = 0
+    base[5] = 0
+    crc = calculate_crc16(bytes(base))
+    base[4] = crc & 0xFF
+    base[5] = (crc >> 8) & 0xFF
 
-    # For now, keep original checksum - display may not verify it
     return bytes(base)
 
 
 def create_time_packet_line2(time_str: str) -> bytes:
     """
     Create time packet for line 2 using WORKING packet as template
+    Properly calculates CRC and uses correct text length (34 bytes)
 
     Args:
         time_str: Time like "00:10.362"
@@ -69,7 +90,7 @@ def create_time_packet_line2(time_str: str) -> bytes:
     Returns:
         Packet bytes
     """
-    # Use time_7sec packet as template but change line address to 0x10
+    # Use time_7sec packet as template but change line address to 0x10 (58 bytes total)
     base = bytearray.fromhex('1B 07 3A 00 51 8B 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 30 30 27 30 37 22 2E 34 36 37 20 20 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
 
     # Format time
@@ -84,11 +105,19 @@ def create_time_packet_line2(time_str: str) -> bytes:
     else:
         formatted = time_str
 
-    # Pad to match original length
-    time_text = formatted.ljust(11)[:11].encode('ascii')
+    # Pad text: "00'10".362  - " -> exactly 34 bytes
+    # Text starts at byte 22, ends at byte 55 (34 bytes)
+    # Bytes 56-57 are ALWAYS 0D 0A (\r\n) - DO NOT OVERWRITE!
+    text_padded = (formatted + "  - ").ljust(34)[:34]
+    base[22:56] = text_padded.encode('ascii', errors='replace')
+    # base[56:58] remains 0D 0A
 
-    # Replace time bytes
-    base[22:22+11] = time_text
+    # Recalculate CRC (bytes 4-5)
+    base[4] = 0
+    base[5] = 0
+    crc = calculate_crc16(bytes(base))
+    base[4] = crc & 0xFF
+    base[5] = (crc >> 8) & 0xFF
 
     return bytes(base)
 
@@ -96,8 +125,7 @@ def create_time_packet_line2(time_str: str) -> bytes:
 def create_ranking_packet(time_str: str, place: int, line: int) -> bytes:
     """
     Create packet for ranking mode with place number
-
-    Uses working packets as templates to avoid checksum issues.
+    Properly calculates CRC (62 bytes total for META packet)
 
     Args:
         time_str: Time like "00:07.787"
@@ -108,10 +136,10 @@ def create_ranking_packet(time_str: str, place: int, line: int) -> bytes:
         Packet bytes
     """
     if line == 1:
-        # Use time_7sec_tor1 as template
+        # Use time_7sec_tor1 as template (META packet - 62 bytes)
         base = bytearray.fromhex('1B 07 3E 00 A1 2A 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 37 22 2E 37 38 37 20 54 4F 52 20 31 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
     else:
-        # Use time_10sec_tor2 as template
+        # Use time_10sec_tor2 as template (META packet - 62 bytes)
         base = bytearray.fromhex('1B 07 3E 00 8F 5C 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 30 30 27 31 30 22 2E 33 36 32 20 54 4F 52 20 32 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
 
     # Format time: "00:07.787" -> "00'07".787"
@@ -126,19 +154,23 @@ def create_ranking_packet(time_str: str, place: int, line: int) -> bytes:
     else:
         formatted = time_str
 
-    time_text = formatted.encode('ascii')
-
     # Format place: "1." or "12."
     place_text = f"{place}."
 
     # Build display text: time + space + place
-    # Total should be same length as original (38 bytes for text part)
-    display_text = (time_text + b' ' + place_text.encode('ascii')).ljust(38, b' ')
+    # META packet has 38 bytes of text (bytes 22-59)
+    # Bytes 60-61 are ALWAYS 0D 0A (\r\n) - DO NOT OVERWRITE!
+    display_text = f"{formatted} {place_text}".ljust(38)[:38]
+    base[22:60] = display_text.encode('ascii', errors='replace')
+    # base[60:62] remains 0D 0A
 
-    # Replace text part (starts at byte 22)
-    base[22:22+38] = display_text
+    # Recalculate CRC (bytes 4-5)
+    base[4] = 0
+    base[5] = 0
+    crc = calculate_crc16(bytes(base))
+    base[4] = crc & 0xFF
+    base[5] = (crc >> 8) & 0xFF
 
-    # Keep original checksum - display likely doesn't verify it strictly
     return bytes(base)
 
 
@@ -211,12 +243,13 @@ class LEDDisplay:
         self.connected = False
         print("✅ Rozłączono z tablicą LED")
 
-    def send_packet(self, packet_data):
+    def send_packet(self, packet_data, delay=0.1):
         """
         Send raw packet
 
         Args:
             packet_data: bytes or packet name (str)
+            delay: Delay after sending in seconds (default 0.1, use 0 for timer)
         """
         if not self.connected:
             return False
@@ -230,7 +263,8 @@ class LEDDisplay:
         try:
             self.ser.write(packet_data)
             self.ser.flush()
-            time.sleep(0.1)
+            if delay > 0:
+                time.sleep(delay)
             return True
         except Exception as e:
             print(f"❌ Błąd wysyłania: {e}")
@@ -481,7 +515,8 @@ class LEDDisplayManager:
 
             # Show time on line 1 (without clearing - just overwrite)
             packet = create_time_packet_line1(time_str)
-            self.display.send_packet(packet)
+            # Use delay=0 for timer to avoid slowdown!
+            self.display.send_packet(packet, delay=0)
 
             # Update every 100ms
             time.sleep(0.1)
