@@ -2095,8 +2095,11 @@ class ChronometerManager:
 
         if len(self.left_lane_crossings) == 5 and self.left_lane_result is None:
             left_time = self.left_lane_crossings[-1]
+
+            # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
             self.left_lane_result = left_time
-            self.left_lane_finished = True  # Ustaw flagę dla niezależnego zegara
+            self.left_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
+
             timestamp = datetime.now().strftime("%H:%M:%S")
 
             self.measurements.append({
@@ -2119,12 +2122,15 @@ class ChronometerManager:
                 result_str = self.format_time_mmss(left_time)
                 packet1 = create_time_packet_line1(result_str, add_dash=True)
                 self.led_manager.display.send_packet(packet1, delay=0)
-                print(f"📺 LED: LEWY TOR (DRUŻYNA) zakończony - {result_str}")
+                print(f"📺 LED: LEWY TOR (DRUŻYNA) zakończony - result_time={left_time:.4f}s, formatted={result_str}")
 
         if len(self.right_lane_crossings) == 5 and self.right_lane_result is None:
             right_time = self.right_lane_crossings[-1]
+
+            # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
             self.right_lane_result = right_time
-            self.right_lane_finished = True  # Ustaw flagę dla niezależnego zegara
+            self.right_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
+
             timestamp = datetime.now().strftime("%H:%M:%S")
 
             self.measurements.append({
@@ -2147,7 +2153,7 @@ class ChronometerManager:
                 result_str = self.format_time_mmss(right_time)
                 packet2 = create_time_packet_line2(result_str, add_dash=True)
                 self.led_manager.display.send_packet(packet2, delay=0)
-                print(f"📺 LED: PRAWY TOR (DRUŻYNA) zakończony - {result_str}")
+                print(f"📺 LED: PRAWY TOR (DRUŻYNA) zakończony - result_time={right_time:.4f}s, formatted={result_str}")
 
         if len(self.left_lane_crossings) == 5 and len(self.right_lane_crossings) == 5:
             self.timer_running = False
@@ -2238,8 +2244,11 @@ class ChronometerManager:
 
         if len(self.left_lane_crossings) == 13 and self.left_lane_result is None:
             left_time = self.left_lane_crossings[-1]
+
+            # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
             self.left_lane_result = left_time
-            self.left_lane_finished = True  # Ustaw flagę dla niezależnego zegara
+            self.left_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
+
             timestamp = datetime.now().strftime("%H:%M:%S")
 
             self.measurements.append({
@@ -2262,12 +2271,15 @@ class ChronometerManager:
                 result_str = self.format_time_mmss(left_time)
                 packet1 = create_time_packet_line1(result_str, add_dash=True)
                 self.led_manager.display.send_packet(packet1, delay=0)
-                print(f"📺 LED: LEWY TOR (WACHADŁO) zakończony - {result_str}")
+                print(f"📺 LED: LEWY TOR (WACHADŁO) zakończony - result_time={left_time:.4f}s, formatted={result_str}")
 
         if len(self.right_lane_crossings) == 13 and self.right_lane_result is None:
             right_time = self.right_lane_crossings[-1]
+
+            # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
             self.right_lane_result = right_time
-            self.right_lane_finished = True  # Ustaw flagę dla niezależnego zegara
+            self.right_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
+
             timestamp = datetime.now().strftime("%H:%M:%S")
 
             self.measurements.append({
@@ -2290,7 +2302,7 @@ class ChronometerManager:
                 result_str = self.format_time_mmss(right_time)
                 packet2 = create_time_packet_line2(result_str, add_dash=True)
                 self.led_manager.display.send_packet(packet2, delay=0)
-                print(f"📺 LED: PRAWY TOR (WACHADŁO) zakończony - {result_str}")
+                print(f"📺 LED: PRAWY TOR (WACHADŁO) zakończony - result_time={right_time:.4f}s, formatted={result_str}")
 
         if len(self.left_lane_crossings) == 13 and len(self.right_lane_crossings) == 13:
             self.timer_running = False
@@ -2620,13 +2632,15 @@ class ChronometerManager:
             if not self.left_lane_finished and not self.right_lane_finished:
                 lane = messagebox.askquestion("Który?", "Lewy (TAK) / Prawy (NIE)?")
                 if lane == 'yes':
+                    # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
+                    self.left_lane_result = result_time
+                    self.left_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
+
                     is_blocked = self.osf_block_var.get()
                     self.osf_all_left_crossings.append((result_time, is_blocked))
                     if not is_blocked:
                         self.left_lane_crossings.append(result_time)
 
-                    self.left_lane_result = result_time
-                    self.left_lane_finished = True
                     timestamp = datetime.now().strftime("%H:%M:%S")
                     self.measurements.append({
                         'race': self.race_number,
@@ -2648,15 +2662,17 @@ class ChronometerManager:
                         result_str = self.format_time_mmss(result_time)
                         packet1 = create_time_packet_line1(result_str, add_dash=True)
                         self.led_manager.display.send_packet(packet1, delay=0)
-                        print(f"📺 LED: LEWY TOR (RĘCZ) zakończony - {result_str}")
+                        print(f"📺 LED: LEWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
                 else:
+                    # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
+                    self.right_lane_result = result_time
+                    self.right_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
+
                     is_blocked = self.osf_block_var.get()
                     self.osf_all_right_crossings.append((result_time, is_blocked))
                     if not is_blocked:
                         self.right_lane_crossings.append(result_time)
 
-                    self.right_lane_result = result_time
-                    self.right_lane_finished = True
                     timestamp = datetime.now().strftime("%H:%M:%S")
                     self.measurements.append({
                         'race': self.race_number,
@@ -2678,18 +2694,20 @@ class ChronometerManager:
                         result_str = self.format_time_mmss(result_time)
                         packet2 = create_time_packet_line2(result_str, add_dash=True)
                         self.led_manager.display.send_packet(packet2, delay=0)
-                        print(f"📺 LED: PRAWY TOR (RĘCZ) zakończony - {result_str}")
+                        print(f"📺 LED: PRAWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
                 self.update_osf_display()
 
             elif self.left_lane_finished and not self.right_lane_finished:
+                # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
+                self.right_lane_result = result_time
+                self.right_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
+
                 is_blocked = self.osf_block_var.get()
                 self.osf_all_right_crossings.append((result_time, is_blocked))
                 if not is_blocked:
                     self.right_lane_crossings.append(result_time)
 
-                self.right_lane_result = result_time
-                self.right_lane_finished = True
                 timestamp = datetime.now().strftime("%H:%M:%S")
                 self.measurements.append({
                     'race': self.race_number,
@@ -2711,18 +2729,20 @@ class ChronometerManager:
                     result_str = self.format_time_mmss(result_time)
                     packet2 = create_time_packet_line2(result_str, add_dash=True)
                     self.led_manager.display.send_packet(packet2, delay=0)
-                    print(f"📺 LED: PRAWY TOR (RĘCZ) zakończony - {result_str}")
+                    print(f"📺 LED: PRAWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
                 self.update_osf_display()
 
             elif not self.left_lane_finished and self.right_lane_finished:
+                # KRYTYCZNA SEKCJA - zatrzymaj wysyłanie biegnącego czasu NATYCHMIAST
+                self.left_lane_result = result_time
+                self.left_lane_finished = True  # <--- USTAW FLAGĘ NAJPIERW!
+
                 is_blocked = self.osf_block_var.get()
                 self.osf_all_left_crossings.append((result_time, is_blocked))
                 if not is_blocked:
                     self.left_lane_crossings.append(result_time)
 
-                self.left_lane_result = result_time
-                self.left_lane_finished = True
                 timestamp = datetime.now().strftime("%H:%M:%S")
                 self.measurements.append({
                     'race': self.race_number,
@@ -2744,7 +2764,7 @@ class ChronometerManager:
                     result_str = self.format_time_mmss(result_time)
                     packet1 = create_time_packet_line1(result_str, add_dash=True)
                     self.led_manager.display.send_packet(packet1, delay=0)
-                    print(f"📺 LED: LEWY TOR (RĘCZ) zakończony - {result_str}")
+                    print(f"📺 LED: LEWY TOR (RĘCZ) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
 
                 self.update_osf_display()
 
