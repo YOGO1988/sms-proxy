@@ -37,14 +37,39 @@ def calculate_crc16(data: bytes) -> int:
 
 def create_time_packet(text: str, base_packet: bytes) -> bytes:
     """
-    Tworzy pakiet TIME z nowym tekstem
+    Tworzy pakiet TIME z nowym tekstem (58 bajtów)
     Używa działającego pakietu jako bazowego
     """
     packet = bytearray(base_packet)
 
-    # Tekst zaczyna się od bajtu 22
-    text_padded = text.ljust(36)[:36]  # Dokładnie 36 znaków
-    packet[22:58] = text_padded.encode('ascii', errors='replace')
+    # Tekst zaczyna się od bajtu 22, kończy na 55 (34 bajty)
+    # Bajty 56-57 to ZAWSZE 0D 0A (\r\n) - NIE NADPISUJ!
+    text_padded = text.ljust(34)[:34]  # Dokładnie 34 znaki (nie 36!)
+    packet[22:56] = text_padded.encode('ascii', errors='replace')
+    # packet[56:58] pozostaje 0D 0A
+
+    # Przelicz CRC (bajty 4-5)
+    packet[4] = 0
+    packet[5] = 0
+    crc = calculate_crc16(bytes(packet))
+    packet[4] = crc & 0xFF
+    packet[5] = (crc >> 8) & 0xFF
+
+    return bytes(packet)
+
+
+def create_meta_packet(text: str, base_packet: bytes) -> bytes:
+    """
+    Tworzy pakiet META z nowym tekstem (62 bajty)
+    Pakiet META ma bajt 2 = 0x3E i tekst 38 znaków
+    """
+    packet = bytearray(base_packet)
+
+    # Tekst zaczyna się od bajtu 22, kończy na 59 (38 bajtów)
+    # Bajty 60-61 to ZAWSZE 0D 0A (\r\n) - NIE NADPISUJ!
+    text_padded = text.ljust(38)[:38]  # Dokładnie 38 znaków
+    packet[22:60] = text_padded.encode('ascii', errors='replace')
+    # packet[60:62] pozostaje 0D 0A
 
     # Przelicz CRC (bajty 4-5)
     packet[4] = 0
@@ -171,20 +196,8 @@ try:
         print(f"Czas końcowy: {final_time}")
 
         # Wyślij META
-        packet = create_time_packet(f"{final_time} TOR 1", TIME_BASE_TOR1)
-        # Zmień rozmiar na 0x3E (META)
-        packet_array = bytearray(packet)
-        packet_array[2] = 0x3E
-        # Rozszerz do 62 bajtów (dodaj 4 bajty spacji)
-        packet_array = packet_array[:58] + b'    ' + packet_array[58:]
-        # Przelicz CRC
-        packet_array[4] = 0
-        packet_array[5] = 0
-        crc = calculate_crc16(bytes(packet_array))
-        packet_array[4] = crc & 0xFF
-        packet_array[5] = (crc >> 8) & 0xFF
-
-        send_packet(ser, bytes(packet_array), f"META TOR 1: {final_time}")
+        packet = create_meta_packet(f"{final_time} TOR 1", TIME_META_TOR1)
+        send_packet(ser, packet, f"META TOR 1: {final_time}")
 
     print("\n" + "="*70)
     print("✅ TEST ZAKOŃCZONY!")
