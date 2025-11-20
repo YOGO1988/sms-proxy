@@ -376,8 +376,14 @@ class LEDDisplay:
             place: Place number (1, 2, 3, 4, ...)
             line: Display line (1 or 2)
         """
-        packet = create_ranking_packet(time_str, place, line)
-        return self.send_packet(packet)
+        # TEMPORARY: Use original packets to debug
+        # If this works, checksum is the issue
+        if line == 1:
+            print(f"   [DEBUG] Wysyłam pakiet TOR 1 (zamiast miejsca {place})")
+            return self.send_packet('time_7sec_tor1')
+        else:
+            print(f"   [DEBUG] Wysyłam pakiet TOR 2 (zamiast miejsca {place})")
+            return self.send_packet('time_10sec_tor2')
 
 
 class LEDDisplayManager:
@@ -386,6 +392,7 @@ class LEDDisplayManager:
     Obsługuje:
     - Tryb 2-torowy (wyniki dla 2 zawodników na TOR 1 i TOR 2)
     - Tryb rankingowy (wyniki dla 3+ zawodników w parach: 1-2, 3-4, 5-6...)
+    - Test timera (start/meta)
     """
 
     def __init__(self, port='COM5', baudrate=9600):
@@ -393,6 +400,9 @@ class LEDDisplayManager:
         self.rotation_thread = None
         self.rotation_active = False
         self.current_mode = None  # '2lane' or 'ranking'
+        self.timer_thread = None
+        self.timer_active = False
+        self.timer_start_time = None
 
     def initialize(self):
         """Connect to display"""
@@ -412,6 +422,7 @@ class LEDDisplayManager:
     def shutdown(self):
         """Disconnect and turn off"""
         self.stop_rotation()
+        self.stop_timer()
         self.display.turn_off()
         self.display.disconnect()
 
@@ -453,6 +464,81 @@ class LEDDisplayManager:
         self.rotation_active = False
         if self.rotation_thread and self.rotation_thread.is_alive():
             self.rotation_thread.join(timeout=2)
+
+    def stop_timer(self):
+        """Stop timer thread"""
+        self.timer_active = False
+        if self.timer_thread and self.timer_thread.is_alive():
+            self.timer_thread.join(timeout=2)
+
+    def _timer_worker(self):
+        """Worker thread for running timer"""
+        self.timer_start_time = time.time()
+        print("⏱️  START! Timer rozpoczęty...")
+
+        while self.timer_active:
+            elapsed = time.time() - self.timer_start_time
+            minutes = int(elapsed // 60)
+            seconds = int(elapsed % 60)
+            milliseconds = int((elapsed % 1) * 1000)
+
+            time_str = f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
+            # Update display with current time
+            self.display.clear_display()
+            time.sleep(0.05)
+
+            # Show time on line 1
+            packet = create_time_packet_line1(time_str)
+            self.display.send_packet(packet)
+
+            # Update every 100ms
+            time.sleep(0.1)
+
+    def start_timer(self):
+        """Start running timer"""
+        self.stop_rotation()
+        self.stop_timer()
+
+        print("🏁 Przygotowanie do startu...")
+        self.display.clear_display()
+        time.sleep(0.5)
+
+        # Start timer in background
+        self.timer_active = True
+        self.timer_thread = threading.Thread(
+            target=self._timer_worker,
+            daemon=True
+        )
+        self.timer_thread.start()
+
+    def finish_timer(self):
+        """Stop timer and show final time"""
+        if not self.timer_active:
+            print("⚠️  Timer nie jest aktywny!")
+            return None
+
+        # Stop timer
+        self.timer_active = False
+        if self.timer_thread:
+            self.timer_thread.join(timeout=1)
+
+        # Calculate final time
+        final_time = time.time() - self.timer_start_time
+        minutes = int(final_time // 60)
+        seconds = int(final_time % 60)
+        milliseconds = int((final_time % 1) * 1000)
+        time_str = f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
+        print(f"🏁 META! Czas: {time_str}")
+
+        # Show final time
+        self.display.clear_display()
+        time.sleep(0.1)
+        packet = create_time_packet_line1(time_str)
+        self.display.send_packet(packet)
+
+        return time_str
 
     def _rotation_worker_ranking(self, results: List[dict]):
         """
@@ -641,6 +727,8 @@ def main():
     print("  clear           - Wyczyść tablicę")
     print("  2lane           - Test trybu 2-torowego")
     print("  ranking         - Test trybu rankingowego")
+    print("  start           - Start timera (Enter = impuls start)")
+    print("  meta            - Meta/Stop timera (Enter = impuls meta)")
     print("  quit            - Wyjście")
 
     try:
@@ -696,6 +784,17 @@ def main():
                 print("\n⏱️  Rotacja przez 15 sekund...")
                 time.sleep(15)
                 manager.stop_rotation()
+
+            elif cmd == 'start':
+                print("\n🏁 Naciśnij ENTER aby wystartować timer...")
+                input()
+                manager.start_timer()
+                print("⏱️  Timer działa! Wpisz 'meta' aby zatrzymać")
+
+            elif cmd == 'meta':
+                final_time = manager.finish_timer()
+                if final_time:
+                    print(f"✅ Zapisany czas: {final_time}")
 
             else:
                 print("❌ Nieznana komenda")
