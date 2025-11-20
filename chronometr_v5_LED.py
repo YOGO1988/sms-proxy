@@ -2540,17 +2540,29 @@ class ChronometerManager:
                 if self.current_mode in [MeasurementMode.OSF_DWA_TORY,
                                         MeasurementMode.OSF_DRUZYNA,
                                         MeasurementMode.WACHADLO]:
-                    # KLUCZOWA NAPRAWA: Wysyłaj biegnący czas TYLKO dla torów które NIE zakończyły!
-                    # To zapobiega nadpisywaniu wyników finałowych
+                    # KLUCZOWA NAPRAWA: ZAWSZE wysyłaj pakiety co 50ms dla pełnej synchronizacji!
+                    # Dla torów biegnących: wysyłaj czas bieżący
+                    # Dla torów zakończonych: CIĄGLE wysyłaj czas finałowy (tak jak w LA!)
                     # UŻYWAMY PAKIETÓW FINAŁOWYCH (0x3E) ŻEBY POKAZAĆ NAZWY TORÓW
+
                     if not self.left_lane_finished:
                         # TOR 1 (linia 1) - nadal biegnie, POKAZUJ NAZWĘ "TOR 1"
                         packet1 = create_finish_packet_line1(time_str_formatted)
+                        self.led_manager.display.send_packet(packet1, delay=0.02)
+                    elif self.left_lane_result is not None:
+                        # TOR 1 zakończony - CIĄGLE wysyłaj czas finałowy dla synchronizacji!
+                        result_str = self.format_time_mmss(self.left_lane_result)
+                        packet1 = create_finish_packet_line1(result_str)
                         self.led_manager.display.send_packet(packet1, delay=0.02)
 
                     if not self.right_lane_finished:
                         # TOR 2 (linia 2) - nadal biegnie, POKAZUJ NAZWĘ "TOR 2"
                         packet2 = create_finish_packet_line2(time_str_formatted)
+                        self.led_manager.display.send_packet(packet2, delay=0)
+                    elif self.right_lane_result is not None:
+                        # TOR 2 zakończony - CIĄGLE wysyłaj czas finałowy dla synchronizacji!
+                        result_str = self.format_time_mmss(self.right_lane_result)
+                        packet2 = create_finish_packet_line2(result_str)
                         self.led_manager.display.send_packet(packet2, delay=0)
 
                 else:
