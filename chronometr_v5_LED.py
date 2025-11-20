@@ -2028,6 +2028,8 @@ class ChronometerManager:
 
             self.left_lane_result = None
             self.right_lane_result = None
+            self.left_lane_finished = False
+            self.right_lane_finished = False
             self.race_number += 1
             self.count_label.config(text=str(self.race_number))
             self.osf_manage_btn.config(state='normal')
@@ -2076,6 +2078,7 @@ class ChronometerManager:
         if len(self.left_lane_crossings) == 5 and self.left_lane_result is None:
             left_time = self.left_lane_crossings[-1]
             self.left_lane_result = left_time
+            self.left_lane_finished = True  # Ustaw flagę dla niezależnego zegara
             timestamp = datetime.now().strftime("%H:%M:%S")
 
             self.measurements.append({
@@ -2096,6 +2099,7 @@ class ChronometerManager:
         if len(self.right_lane_crossings) == 5 and self.right_lane_result is None:
             right_time = self.right_lane_crossings[-1]
             self.right_lane_result = right_time
+            self.right_lane_finished = True  # Ustaw flagę dla niezależnego zegara
             timestamp = datetime.now().strftime("%H:%M:%S")
 
             self.measurements.append({
@@ -2146,6 +2150,10 @@ class ChronometerManager:
             self.osf_all_left_crossings = []
             self.osf_all_right_crossings = []
 
+            self.left_lane_result = None
+            self.right_lane_result = None
+            self.left_lane_finished = False
+            self.right_lane_finished = False
             self.race_number += 1
             self.count_label.config(text=str(self.race_number))
             self.osf_manage_btn.config(state='normal')
@@ -2199,6 +2207,7 @@ class ChronometerManager:
         if len(self.left_lane_crossings) == 13 and self.left_lane_result is None:
             left_time = self.left_lane_crossings[-1]
             self.left_lane_result = left_time
+            self.left_lane_finished = True  # Ustaw flagę dla niezależnego zegara
             timestamp = datetime.now().strftime("%H:%M:%S")
 
             self.measurements.append({
@@ -2219,6 +2228,7 @@ class ChronometerManager:
         if len(self.right_lane_crossings) == 13 and self.right_lane_result is None:
             right_time = self.right_lane_crossings[-1]
             self.right_lane_result = right_time
+            self.right_lane_finished = True  # Ustaw flagę dla niezależnego zegara
             timestamp = datetime.now().strftime("%H:%M:%S")
 
             self.measurements.append({
@@ -2351,7 +2361,7 @@ class ChronometerManager:
     def update_live_timer(self):
         """Live timer"""
         if self.timer_running and self.start_absolute_time:
-            elapsed = time.time() - self.start_absolute_time + 0.10  # Korekcja +0.10s
+            elapsed = time.time() - self.start_absolute_time
             self.timer_label.config(text=self.format_time_mmss(elapsed), fg='#4CAF50')
 
             # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (OSF) ===
@@ -2398,7 +2408,7 @@ class ChronometerManager:
             self.timer_label.config(text="00:00.00", fg='#9E9E9E')
 
         if self.la_race_active and self.la_start_absolute_time:
-            elapsed_la = time.time() - self.la_start_absolute_time + 0.10  # Korekcja +0.10s
+            elapsed_la = time.time() - self.la_start_absolute_time
             self.la_timer_label.config(text=self.format_time_mmss(elapsed_la), fg='#4CAF50')
 
             # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (LA) ===
@@ -2474,6 +2484,10 @@ class ChronometerManager:
         if not self.ready_for_start:
             messagebox.showwarning("Uwaga", "Kliknij KOLEJNY BIEG!")
             return
+
+        # === WYCZYŚĆ LED PRZY STARCIE ===
+        if self.led_enabled and self.led_manager:
+            self.led_manager.display.clear_display()
 
         self.start_time = 0
         self.start_absolute_time = time.time()
