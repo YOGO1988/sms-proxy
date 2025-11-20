@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Test START/STOP - POPRAWIONE PAKIETY z oryginalnego programu
+Pakiety czyszczące: komenda 0x08, rozmiar 0xE8 (232 bajty), wypełnione zerami
+"""
+
+import serial
+import time
+import threading
+import sys
+
+# Pakiet inicjalizacyjny (z oryginalnego programu)
+INIT_PACKET = bytes.fromhex('1B 09 0A 00 A4 EB 00 00 0D 0A')
+
+# PRAWDZIWY pakiet czyszczący LINIA 1 (z oryginalnego programu)
+# Komenda 0x08, rozmiar 0xE8 (232 bajty), bajt [16] = 01 (linia 1)
+CLEAR_LINE1 = bytes.fromhex('1B 08 E8 00 22 71 00 00 01 00 00 00 00 00 00 00 01 00 0A 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0D 0A')
+
+# PRAWDZIWY pakiet czyszczący LINIA 2 (z oryginalnego programu)
+# Komenda 0x08, rozmiar 0xE8 (232 bajty), bajt [16] = 02 (linia 2), bajt [20-21] = 10 00, bajt [28-29] = 38 00
+CLEAR_LINE2 = bytes.fromhex('1B 08 E8 00 23 E6 00 00 01 00 00 00 00 00 00 00 02 00 0A 00 00 00 10 00 00 00 00 00 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0D 0A')
+
+# Bazowy pakiet czasowy (linia 1) - format 0x3A (58 bajtów)
+# Z oryginalnego programu: bajty [18-19] = 00 00 (linia 1)
+BASE_PACKET_LINE1 = bytes.fromhex('1B 07 3A 00 EB 4F 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 32 22 2E 30 37 34 20 20 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A')
+
+# Bazowy pakiet czasowy (linia 2) - format 0x3A (58 bajtów)
+# Z oryginalnego programu: bajty [18-19] = 10 00 (linia 2)
+BASE_PACKET_LINE2 = bytes.fromhex('1B 07 3A 00 65 44 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 30 30 27 30 32 22 2E 30 37 34 20 20 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A')
+
+# Bazowy pakiet META (TOR 1) - format 0x3E (62 bajty)
+BASE_META_TOR1 = bytes.fromhex('1B 07 3E 00 B3 DA 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 36 22 2E 30 35 36 20 54 4F 52 20 31 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A')
+
+# Bazowy pakiet META (TOR 2) - format 0x3E (62 bajty)
+BASE_META_TOR2 = bytes.fromhex('1B 07 3E 00 23 84 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 30 30 27 30 38 22 2E 34 35 30 20 54 4F 52 20 32 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A')
+
+
+def calculate_crc16(data: bytes) -> int:
+    """Oblicz CRC-16 dla pakietu LED (CRC-16-CCITT, poly=0x1021)."""
+    crc = 0x0000
+    for byte in data:
+        crc ^= (byte << 8)
+        for _ in range(8):
+            if crc & 0x8000:
+                crc = (crc << 1) ^ 0x1021
+            else:
+                crc <<= 1
+            crc &= 0xFFFF
+    return crc
+
+
+def format_time_mm_ss_ms(milliseconds: int) -> str:
+    """Formatuje czas w milisekundach na format MM'SS".mmm"""
+    total_seconds = milliseconds // 1000
+    ms = milliseconds % 1000
+    minutes = total_seconds // 60
+    seconds = total_seconds % 60
+    return f"{minutes:02d}'{seconds:02d}\".{ms:03d}"
+
+
+def create_time_packet(text: str, line: int) -> bytes:
+    """
+    Tworzy pakiet czasowy dla wybranej linii.
+
+    Args:
+        text: Tekst do wyświetlenia (np. "00'05".432  - ")
+        line: Numer linii (1 lub 2)
+
+    Returns:
+        Gotowy pakiet do wysłania
+    """
+    # Wybierz bazowy pakiet
+    base = BASE_PACKET_LINE1 if line == 1 else BASE_PACKET_LINE2
+    packet = bytearray(base)
+
+    # Tekst zaczyna się od bajtu 22, długość 36 bajtów (do bajtu 57 włącznie)
+    text_padded = text.ljust(36)
+    packet[22:58] = text_padded.encode('ascii', errors='replace')
+
+    # Przelicz CRC
+    packet[4] = 0
+    packet[5] = 0
+    crc = calculate_crc16(bytes(packet))
+    packet[4] = crc & 0xFF
+    packet[5] = (crc >> 8) & 0xFF
+
+    return bytes(packet)
+
+
+def create_meta_packet(text: str, lane: int) -> bytes:
+    """
+    Tworzy pakiet META dla wybranego toru.
+
+    Args:
+        text: Tekst do wyświetlenia (np. "00'06".033 TOR 1")
+        lane: Numer toru (1 lub 2)
+
+    Returns:
+        Gotowy pakiet do wysłania
+    """
+    base = BASE_META_TOR1 if lane == 1 else BASE_META_TOR2
+    packet = bytearray(base)
+
+    # Tekst zaczyna się od bajtu 22, długość 40 bajtów (do bajtu 61 włącznie)
+    text_padded = text.ljust(40)
+    packet[22:62] = text_padded.encode('ascii', errors='replace')
+
+    # Przelicz CRC
+    packet[4] = 0
+    packet[5] = 0
+    crc = calculate_crc16(bytes(packet))
+    packet[4] = crc & 0xFF
+    packet[5] = (crc >> 8) & 0xFF
+
+    return bytes(packet)
+
+
+def send_init(ser, count=3):
+    """Wysyła inicjalizację N razy"""
+    for i in range(count):
+        ser.write(INIT_PACKET)
+        ser.flush()
+        time.sleep(0.2)
+    time.sleep(0.3)
+
+
+def clear_line(ser, line: int):
+    """
+    Czyści wybraną linię (1 lub 2).
+    Używa PRAWDZIWYCH pakietów czyszczących z oryginalnego programu!
+    """
+    packet = CLEAR_LINE1 if line == 1 else CLEAR_LINE2
+    # W oryginalnym programie pakiet wysyłany 2x
+    ser.write(packet)
+    ser.flush()
+    time.sleep(0.05)
+    ser.write(packet)
+    ser.flush()
+    time.sleep(0.05)
+
+
+class Timer:
+    """Klasa do zarządzania licznikiem czasu"""
+
+    def __init__(self, ser, line: int, update_interval=0.1):
+        self.ser = ser
+        self.line = line  # 1 lub 2
+        self.update_interval = update_interval
+        self.running = False
+        self.start_time = None
+        self.elapsed_ms = 0
+        self.thread = None
+        self.update_count = 0
+        self.line_name = f"LINIA {line}"
+
+    def start(self):
+        """Rozpoczyna liczenie"""
+        self.start_time = time.time()
+        self.running = True
+        self.thread = threading.Thread(target=self._update_loop, daemon=True)
+        self.thread.start()
+        print(f"⏱️  {self.line_name} - START!")
+
+    def stop(self):
+        """Zatrzymuje liczenie"""
+        self.running = False
+        if self.thread:
+            self.thread.join()
+        return self.elapsed_ms
+
+    def _update_loop(self):
+        """Wątek aktualizujący wyświetlacz"""
+        while self.running:
+            # Oblicz aktualny czas
+            self.elapsed_ms = int((time.time() - self.start_time) * 1000)
+
+            # Sformatuj czas
+            time_str = format_time_mm_ss_ms(self.elapsed_ms)
+
+            # Wyślij na wyświetlacz
+            try:
+                # Wyślij nowy czas (bez czyszczenia - zgodnie z oryginalnym programem podczas update)
+                packet = create_time_packet(f"{time_str}  - ", self.line)
+                self.ser.write(packet)
+                self.ser.flush()
+
+                # Debug co 10 aktualizacji
+                self.update_count += 1
+                if self.update_count % 10 == 0:
+                    print(f"   📟 {self.line_name}: {time_str} (#{self.update_count})")
+
+            except Exception as e:
+                print(f"❌ {self.line_name} - Błąd: {e}")
+                self.running = False
+                break
+
+            # Czekaj przed następną aktualizacją
+            time.sleep(self.update_interval)
+
+
+def main():
+    print("="*70)
+    print("TEST START/STOP - POPRAWIONE PAKIETY")
+    print("="*70)
+    print("\n📋 Zmiany:")
+    print("   ✓ Pakiety czyszczące: komenda 0x08 (nie 0x07)")
+    print("   ✓ Rozmiar pakietów: 0xE8 = 232 bajty (nie 58)")
+    print("   ✓ Wypełnienie: same zera (nie spacje)")
+    print("   ✓ Wysyłane 2x (jak w oryginalnym programie)")
+    print("\n📋 Scenariusz:")
+    print("   1. Inicjalizacja + czyszczenie obu linii")
+    print("   2. Enter → START linia 1")
+    print("   3. Enter → STOP linia 1")
+
+    port = input("\nPort (Enter = COM5): ").strip() or "COM5"
+
+    try:
+        print(f"\nŁączę z {port}...")
+        ser = serial.Serial(
+            port=port,
+            baudrate=9600,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=1
+        )
+        print("✅ Połączono!")
+        time.sleep(0.3)
+
+        # KROK 1: Inicjalizacja
+        print("\n" + "="*70)
+        print("KROK 1: Inicjalizacja i czyszczenie")
+        print("="*70)
+
+        print("📤 Inicjalizacja 3x...")
+        send_init(ser, 3)
+
+        print("📤 Czyszczę linię 1 (pakiet 0x08, 232 bajty, 2x)...")
+        clear_line(ser, 1)
+
+        print("📤 Czyszczę linię 2 (pakiet 0x08, 232 bajty, 2x)...")
+        clear_line(ser, 2)
+
+        print("✅ Tablica wyczyszczona!")
+
+        # KROK 2: START
+        input("\n🏁 Naciśnij Enter aby START linia 1... ")
+
+        print("\n" + "="*70)
+        print("KROK 2: LINIA 1 - CZAS PŁYNIE")
+        print("="*70)
+
+        timer = Timer(ser, line=1, update_interval=0.1)
+        timer.start()
+
+        # KROK 3: STOP
+        input("\n🏁 Naciśnij Enter aby STOP... ")
+
+        print("\n" + "="*70)
+        print("KROK 3: META!")
+        print("="*70)
+
+        final_ms = timer.stop()
+        final_time = format_time_mm_ss_ms(final_ms)
+        print(f"⏱️  Końcowy czas: {final_time}")
+
+        # Wyślij META
+        print("📤 Wysyłam META dla TOR 1...")
+        meta_packet = create_meta_packet(f"{final_time} TOR 1", 1)
+        ser.write(meta_packet)
+        ser.flush()
+
+        print("\n✅ Test zakończony!")
+        print("="*70)
+
+        ser.close()
+
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Przerwano (Ctrl+C)")
+    except Exception as e:
+        print(f"\n❌ BŁĄD: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()
+    input("\nNaciśnij Enter aby zakończyć...")

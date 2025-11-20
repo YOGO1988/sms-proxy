@@ -11,25 +11,27 @@ import threading
 import sys
 
 # Pakiet inicjalizacyjny
-INIT_PACKET = bytes.fromhex('1B 09 0A 00 A4 EB 00 00 0D 0A'.replace(' ', ''))
+INIT_PACKET = bytes.fromhex('1B 09 0A 00 A4 EB 00 00 0D 0A')
 
-# Pakiet czyszczący linię 1 (TOR 1)
-EMPTY_LINE1 = bytes.fromhex('1B 07 3A 00 BD CA 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+# PRAWDZIWY pakiet czyszczący LINIA 1 (TOR 1) - z oryginalnego programu
+# Komenda 0x08, rozmiar 0xE8 (232 bajty), wypełniony zerami
+CLEAR_LINE1 = bytes.fromhex('1B 08 E8 00 22 71 00 00 01 00 00 00 00 00 00 00 01 00 0A 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0D 0A')
 
-# Pakiet czyszczący linię 2 (TOR 2) - UWAGA: bajty [18-19] = 10 00!
-EMPTY_LINE2 = bytes.fromhex('1B 07 3A 00 60 FC 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+# PRAWDZIWY pakiet czyszczący LINIA 2 (TOR 2) - z oryginalnego programu
+# Komenda 0x08, rozmiar 0xE8 (232 bajty), bajt [16] = 02, bajt [20-21] = 10 00, bajt [28-29] = 38 00
+CLEAR_LINE2 = bytes.fromhex('1B 08 E8 00 23 E6 00 00 01 00 00 00 00 00 00 00 02 00 0A 00 00 00 10 00 00 00 00 00 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0D 0A')
 
-# Bazowy pakiet czasowy (TOR 1) - bajty [18-19] = 00 00
-BASE_PACKET_TOR1 = bytes.fromhex('1B 07 3A 00 51 E1 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 31 22 2E 37 35 38 20 20 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+# Bazowy pakiet czasowy (TOR 1) - z oryginalnego programu, bajty [18-19] = 00 00
+BASE_PACKET_TOR1 = bytes.fromhex('1B 07 3A 00 EB 4F 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 32 22 2E 30 37 34 20 20 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A')
 
-# Bazowy pakiet czasowy (TOR 2) - bajty [18-19] = 10 00
-BASE_PACKET_TOR2 = bytes.fromhex('1B 07 3A 00 A7 1C 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 30 30 27 30 31 22 2E 39 38 32 20 20 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+# Bazowy pakiet czasowy (TOR 2) - z oryginalnego programu, bajty [18-19] = 10 00
+BASE_PACKET_TOR2 = bytes.fromhex('1B 07 3A 00 65 44 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 30 30 27 30 32 22 2E 30 37 34 20 20 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A')
 
-# Bazowy pakiet META (TOR 1) - rozmiar 0x3E (62 bajty), zawiera "TOR 1"
-BASE_META_TOR1 = bytes.fromhex('1B 07 3E 00 C9 8B 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 36 22 2E 30 33 33 20 54 4F 52 20 31 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+# Bazowy pakiet META (TOR 1) - z oryginalnego programu, rozmiar 0x3E (62 bajty)
+BASE_META_TOR1 = bytes.fromhex('1B 07 3E 00 B3 DA 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 36 22 2E 30 35 36 20 54 4F 52 20 31 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A')
 
-# Bazowy pakiet META (TOR 2) - rozmiar 0x3E (62 bajty), zawiera "TOR 2"
-BASE_META_TOR2 = bytes.fromhex('1B 07 3E 00 AF EA 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 30 30 27 30 38 22 2E 39 36 38 20 54 4F 52 20 32 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+# Bazowy pakiet META (TOR 2) - z oryginalnego programu, rozmiar 0x3E (62 bajty)
+BASE_META_TOR2 = bytes.fromhex('1B 07 3E 00 23 84 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 30 30 27 30 38 22 2E 34 35 30 20 54 4F 52 20 32 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A')
 
 
 def calculate_crc16(data: bytes) -> int:
@@ -156,11 +158,17 @@ def send_init(ser, count=3):
 
 
 def clear_lane(ser, lane: int):
-    """Czyści wybrany tor (1 lub 2)"""
-    packet = EMPTY_LINE1 if lane == 1 else EMPTY_LINE2
+    """
+    Czyści wybrany tor (1 lub 2) - PRAWDZIWY pakiet z oryginalnego programu!
+    Komenda 0x08, 232 bajty, wysyłany 2x
+    """
+    packet = CLEAR_LINE1 if lane == 1 else CLEAR_LINE2
     ser.write(packet)
     ser.flush()
-    time.sleep(0.1)
+    time.sleep(0.05)
+    ser.write(packet)
+    ser.flush()
+    time.sleep(0.05)
 
 
 class LaneTimer:
@@ -203,10 +211,7 @@ class LaneTimer:
 
             # Wyślij na wyświetlacz
             try:
-                # WAŻNE: Wyczyść linię przed aktualizacją
-                clear_lane(self.ser, self.lane)
-
-                # Wyślij nowy czas (z "  - " na końcu jak w oryginalnych pakietach)
+                # Wyślij nowy czas (bez czyszczenia podczas update)
                 packet = create_time_packet(f"{time_str}  - ", self.lane)
                 self.ser.write(packet)
                 self.ser.flush()

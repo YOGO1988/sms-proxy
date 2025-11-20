@@ -11,16 +11,18 @@ import threading
 import sys
 
 # Pakiet inicjalizacyjny
-INIT_PACKET = bytes.fromhex('1B 09 0A 00 A4 EB 00 00 0D 0A'.replace(' ', ''))
+INIT_PACKET = bytes.fromhex('1B 09 0A 00 A4 EB 00 00 0D 0A')
 
-# Pakiet czyszczący linię 1 (same spacje)
-EMPTY_LINE1 = bytes.fromhex('1B 07 3A 00 BD CA 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+# PRAWDZIWY pakiet czyszczący LINIA 1 (z oryginalnego programu)
+# Komenda 0x08, rozmiar 0xE8 (232 bajty), wypełniony zerami
+CLEAR_LINE1 = bytes.fromhex('1B 08 E8 00 22 71 00 00 01 00 00 00 00 00 00 00 01 00 0A 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0D 0A')
 
-# Pakiet czyszczący linię 2 (usuwa tekst producenta)
-EMPTY_LINE2 = bytes.fromhex('1B 07 54 00 60 FC 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 2D 2D 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+# PRAWDZIWY pakiet czyszczący LINIA 2 (z oryginalnego programu)
+# Komenda 0x08, rozmiar 0xE8 (232 bajty), bajt [16] = 02, bajt [20-21] = 10 00, bajt [28-29] = 38 00
+CLEAR_LINE2 = bytes.fromhex('1B 08 E8 00 23 E6 00 00 01 00 00 00 00 00 00 00 02 00 0A 00 00 00 10 00 00 00 00 00 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0D 0A')
 
-# Bazowy pakiet czasowy (linia 1)
-BASE_PACKET = bytes.fromhex('1B 07 3A 00 51 E1 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 31 22 2E 37 35 38 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+# Bazowy pakiet czasowy (linia 1) - z oryginalnego programu
+BASE_PACKET = bytes.fromhex('1B 07 3A 00 EB 4F 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 32 22 2E 30 37 34 20 20 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A')
 
 
 def calculate_crc16(data: bytes) -> int:
@@ -109,17 +111,29 @@ def send_init(ser, count=3):
 
 
 def clear_line1(ser):
-    """Czyści linię 1 (same spacje)"""
-    ser.write(EMPTY_LINE1)
+    """
+    Czyści linię 1 - PRAWDZIWY pakiet z oryginalnego programu!
+    Komenda 0x08, 232 bajty, wysyłany 2x
+    """
+    ser.write(CLEAR_LINE1)
     ser.flush()
-    time.sleep(0.3)
+    time.sleep(0.05)
+    ser.write(CLEAR_LINE1)
+    ser.flush()
+    time.sleep(0.05)
 
 
 def clear_line2(ser):
-    """Czyści linię 2 (usuwa tekst producenta)"""
-    ser.write(EMPTY_LINE2)
+    """
+    Czyści linię 2 - PRAWDZIWY pakiet z oryginalnego programu!
+    Komenda 0x08, 232 bajty, wysyłany 2x
+    """
+    ser.write(CLEAR_LINE2)
     ser.flush()
-    time.sleep(0.3)
+    time.sleep(0.05)
+    ser.write(CLEAR_LINE2)
+    ser.flush()
+    time.sleep(0.05)
 
 
 class Timer:
@@ -167,11 +181,7 @@ class Timer:
                     self.ser.flush()
                     time.sleep(0.05)
 
-                # WAŻNE: Wyczyść linię 1 przed aktualizacją (inaczej wyświetlacz ignoruje nowy tekst)
-                self.ser.write(EMPTY_LINE1)
-                self.ser.flush()
-                time.sleep(0.05)
-
+                # Wyślij nowy czas (bez czyszczenia podczas update)
                 packet = create_time_packet(time_str)
                 self.ser.write(packet)
                 self.ser.flush()
