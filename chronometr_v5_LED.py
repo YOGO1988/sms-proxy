@@ -550,11 +550,17 @@ class ChronometerManager:
         self.led_brightness_scale.pack(side=tk.LEFT, padx=3)
 
         # === POLE TEKSTOWE STATYCZNE ===
-        tk.Label(top_frame, text="Tekst:", font=('Arial', 8), bg='#e8e8e8').pack(side=tk.LEFT, padx=(10, 3))
+        tk.Label(top_frame, text="Linia 1:", font=('Arial', 8), bg='#e8e8e8').pack(side=tk.LEFT, padx=(10, 3))
 
         self.led_text_var = tk.StringVar()
-        self.led_text_entry = tk.Entry(top_frame, textvariable=self.led_text_var, font=('Arial', 9), width=20)
+        self.led_text_entry = tk.Entry(top_frame, textvariable=self.led_text_var, font=('Arial', 9), width=15)
         self.led_text_entry.pack(side=tk.LEFT, padx=3)
+
+        tk.Label(top_frame, text="Linia 2:", font=('Arial', 8), bg='#e8e8e8').pack(side=tk.LEFT, padx=(5, 3))
+
+        self.led_text_var2 = tk.StringVar()
+        self.led_text_entry2 = tk.Entry(top_frame, textvariable=self.led_text_var2, font=('Arial', 9), width=15)
+        self.led_text_entry2.pack(side=tk.LEFT, padx=3)
 
         self.led_send_btn = tk.Button(top_frame, text="Wyślij", command=self.send_custom_text,
                                       font=('Arial', 8), bg='#2196F3', fg='white', padx=8)
@@ -638,24 +644,35 @@ class ChronometerManager:
             messagebox.showwarning("LED", "Tablica LED nie jest podłączona!")
             return
 
-        text = self.led_text_var.get().strip()
-        if not text:
-            messagebox.showwarning("Brak tekstu", "Wpisz tekst do wysłania!")
+        text1 = self.led_text_var.get().strip()
+        text2 = self.led_text_var2.get().strip()
+
+        if not text1 and not text2:
+            messagebox.showwarning("Brak tekstu", "Wpisz tekst do wysłania (przynajmniej jedna linia)!")
             return
 
         try:
             # Zatrzymaj rotację jeśli jest aktywna
             self.led_manager.stop_rotation()
 
-            # Wyślij tekst na obie linie
-            packet1 = create_time_packet_line1(text)
-            self.led_manager.display.send_packet(packet1, delay=0.05)
+            # Wyślij tekst na linię 1
+            if text1:
+                packet1 = create_time_packet_line1(text1)
+                self.led_manager.display.send_packet(packet1, delay=0.05)
+            else:
+                # Jeśli puste, wyczyść linię 1
+                self.led_manager.display.send_packet('clear_line1', delay=0.05)
 
-            packet2 = create_time_packet_line2(text)
-            self.led_manager.display.send_packet(packet2, delay=0.05)
+            # Wyślij tekst na linię 2
+            if text2:
+                packet2 = create_time_packet_line2(text2)
+                self.led_manager.display.send_packet(packet2, delay=0.05)
+            else:
+                # Jeśli puste, wyczyść linię 2
+                self.led_manager.display.send_packet('clear_line2', delay=0.05)
 
-            print(f"📺 LED: Wysłano tekst statyczny: '{text}'")
-            messagebox.showinfo("LED", f"Wysłano tekst:\n{text}")
+            print(f"📺 LED: Wysłano tekst statyczny - Linia 1: '{text1}', Linia 2: '{text2}'")
+            messagebox.showinfo("LED", f"Wysłano tekst:\nLinia 1: {text1 or '(puste)'}\nLinia 2: {text2 or '(puste)'}")
 
         except Exception as e:
             messagebox.showerror("Błąd", f"Nie udało się wysłać tekstu:\n{e}")
@@ -1786,6 +1803,7 @@ class ChronometerManager:
                 self.la_update_results_display()
 
                 if len(self.la_results) == self.la_num_athletes:
+                    self.la_race_active = False  # ZATRZYMAJ TIMER NA LED
                     self.la_status_label.config(text="❌ NIE GOTOWY", bg='red')
                     self.la_next_btn.config(state='normal')
                     self.la_manual_finish_btn.config(state='disabled')
@@ -1953,23 +1971,9 @@ class ChronometerManager:
                     ), tags=('race',))
 
                 self.update_osf_display()
-                
-                # === INTEGRACJA LED DLA OSF DWA TORY ===
-                if self.left_lane_finished and self.right_lane_finished:
-                    if self.led_enabled and self.led_manager:
-                        race_data = {
-                            'results': [
-                                {'time': self.format_time(self.left_lane_result), 'place': 1},
-                                {'time': self.format_time(self.right_lane_result), 'place': 2}
-                            ]
-                        }
-                        # Sortuj wyniki
-                        race_data['results'].sort(key=lambda x: float(x['time'].split(':')[0])*60 + float(x['time'].split(':')[1]))
-                        race_data['results'][0]['place'] = 1
-                        race_data['results'][1]['place'] = 2
-                        
-                        self.led_manager.update_race_results(race_data)
-                        print(f"📺 LED: Wyświetlono wyniki OSF DWA TORY")
+
+                # === NIEZALEŻNE ZEGARY - WYNIKI WYŚWIETLANE NATYCHMIAST W update_live_timer ===
+                # Nie czekamy na oba tory - każdy tor pokazuje wynik jak skończy
 
     def update_osf_display(self):
         """Aktualizacja wyświetlania OSF DWA TORY"""
@@ -2110,21 +2114,9 @@ class ChronometerManager:
 
             max_time = max(self.left_lane_crossings[-1], self.right_lane_crossings[-1])
             self.timer_label.config(text=self.format_time_mmss(max_time))
-            
-            # === INTEGRACJA LED DLA OSF DRUŻYNA ===
-            if self.led_enabled and self.led_manager:
-                race_data = {
-                    'results': [
-                        {'time': self.format_time(self.left_lane_result), 'place': 1},
-                        {'time': self.format_time(self.right_lane_result), 'place': 2}
-                    ]
-                }
-                race_data['results'].sort(key=lambda x: float(x['time'].split(':')[0])*60 + float(x['time'].split(':')[1]))
-                race_data['results'][0]['place'] = 1
-                race_data['results'][1]['place'] = 2
-                
-                self.led_manager.update_race_results(race_data)
-                print(f"📺 LED: Wyświetlono wyniki OSF DRUŻYNA")
+
+            # === NIEZALEŻNE ZEGARY - WYNIKI WYŚWIETLANE NATYCHMIAST W update_live_timer ===
+            # Każdy tor pokazuje wynik jak skończy (nie czekamy na oba tory)
 
     def handle_wachadlo(self, channel, time_seconds):
         """WACHADŁO"""
@@ -2245,21 +2237,9 @@ class ChronometerManager:
 
             max_time = max(self.left_lane_crossings[-1], self.right_lane_crossings[-1])
             self.timer_label.config(text=self.format_time_mmss(max_time))
-            
-            # === INTEGRACJA LED DLA WACHADŁO ===
-            if self.led_enabled and self.led_manager:
-                race_data = {
-                    'results': [
-                        {'time': self.format_time(self.left_lane_result), 'place': 1},
-                        {'time': self.format_time(self.right_lane_result), 'place': 2}
-                    ]
-                }
-                race_data['results'].sort(key=lambda x: float(x['time'].split(':')[0])*60 + float(x['time'].split(':')[1]))
-                race_data['results'][0]['place'] = 1
-                race_data['results'][1]['place'] = 2
-                
-                self.led_manager.update_race_results(race_data)
-                print(f"📺 LED: Wyświetlono wyniki WACHADŁO")
+
+            # === NIEZALEŻNE ZEGARY - WYNIKI WYŚWIETLANE NATYCHMIAST W update_live_timer ===
+            # Każdy tor pokazuje wynik jak skończy (nie czekamy na oba tory)
 
     def update_display(self, text):
         """Aktualizacja pola tekstowego"""
@@ -2307,6 +2287,8 @@ class ChronometerManager:
         self.race_completed = False
         self.race_in_progress = False
         self.start_time = None
+        self.start_absolute_time = None  # RESET CZASU ABSOLUTNEGO
+        self.timer_running = False  # ZATRZYMAJ TIMER
         self.left_lane_crossings.clear()
         self.right_lane_crossings.clear()
 
@@ -2319,15 +2301,18 @@ class ChronometerManager:
 
         self.next_race_btn.config(state='disabled')
 
+        # RESETUJ TIMER NA EKRANIE GUI
+        self.timer_label.config(text="00:00.00", fg='#9E9E9E')
+
         self.display_text.config(state='normal')
         self.display_text.delete(1.0, tk.END)
         self.display_text.insert(tk.END, "⏳ Oczekiwanie na START...\n")
         self.display_text.config(state='disabled')
 
-        # === ZATRZYMAJ ROTACJĘ (jeśli jest), ale NIE czyść LED ===
-        # Wynik zostaje na ekranie do momentu startu nowego biegu
+        # === ZATRZYMAJ ROTACJĘ I WYCZYŚĆ LED ===
         if self.led_enabled and self.led_manager:
             self.led_manager.stop_rotation()
+            self.led_manager.display.clear_display()
 
     def reset_measurement(self):
         """Reset pomiaru"""
@@ -2365,16 +2350,41 @@ class ChronometerManager:
 
             # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (OSF) ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                time_str = self.format_time_mmss(elapsed)
+                # TRYBY Z DWOMA TORAMI - NIEZALEŻNE ZEGARY
+                if self.current_mode in [MeasurementMode.OSF_DWA_TORY,
+                                        MeasurementMode.OSF_DRUZYNA,
+                                        MeasurementMode.WACHADLO]:
+                    # LINIA 1 (LEWY TOR)
+                    if self.left_lane_finished and self.left_lane_result is not None:
+                        # Tor lewy skończył - pokaż wynik
+                        result_str = self.format_time_mmss(self.left_lane_result)
+                        packet1 = create_ranking_packet(result_str, 1, line=1)
+                        packet1_text = result_str + " TOR 1"
+                        # Używamy create_time_packet_line1 z tekstem wyniku
+                        packet1 = create_time_packet_line1(result_str + "  TOR 1")
+                    else:
+                        # Tor lewy biega - pokaż biegnący czas
+                        time_str = self.format_time_mmss(elapsed)
+                        packet1 = create_time_packet_line1(time_str)
 
-                # Wyświetl na linii 1
-                packet = create_time_packet_line1(time_str)
-                self.led_manager.display.send_packet(packet, delay=0)
+                    self.led_manager.display.send_packet(packet1, delay=0)
 
-                # Jeśli OSF DWA TORY - wyświetl też na linii 2
-                if self.current_mode == MeasurementMode.OSF_DWA_TORY:
-                    packet2 = create_time_packet_line2(time_str)
+                    # LINIA 2 (PRAWY TOR)
+                    if self.right_lane_finished and self.right_lane_result is not None:
+                        # Tor prawy skończył - pokaż wynik
+                        result_str = self.format_time_mmss(self.right_lane_result)
+                        packet2 = create_time_packet_line2(result_str + "  TOR 2")
+                    else:
+                        # Tor prawy biega - pokaż biegnący czas
+                        time_str = self.format_time_mmss(elapsed)
+                        packet2 = create_time_packet_line2(time_str)
+
                     self.led_manager.display.send_packet(packet2, delay=0)
+                else:
+                    # TRYBY POJEDYNCZE - jeden zegar
+                    time_str = self.format_time_mmss(elapsed)
+                    packet = create_time_packet_line1(time_str)
+                    self.led_manager.display.send_packet(packet, delay=0)
 
         elif self.race_completed:
             self.timer_label.config(fg='#2196F3')
