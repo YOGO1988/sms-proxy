@@ -22,25 +22,59 @@ CMD_06_00 = bytes.fromhex('1B 06 0C 00 FB E8 00 00 00 00 0D 0A'.replace(' ', '')
 CMD_06_03 = bytes.fromhex('1B 06 0C 00 27 73 00 00 03 00 0D 0A'.replace(' ', ''))
 EMPTY_LINE1 = bytes.fromhex('1B 07 54 00 14 75 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 2D 2D 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
 
+def calculate_crc16(data: bytes) -> int:
+    """
+    Oblicz CRC-16 dla pakietu LED (CRC-16-CCITT, poly=0x1021).
+
+    Args:
+        data: Dane do obliczenia CRC (z wyzerowanym polem CRC na pozycji [4-5])
+
+    Returns:
+        16-bitowy CRC
+    """
+    crc = 0x0000  # Init value
+    for byte in data:
+        crc ^= (byte << 8)
+        for _ in range(8):
+            if crc & 0x8000:
+                crc = (crc << 1) ^ 0x1021
+            else:
+                crc <<= 1
+            crc &= 0xFFFF
+    return crc
+
 def create_time_packet(text: str) -> bytes:
     """
     Tworzy pakiet czasowy z podanym tekstem.
-    Używa bazowego pakietu i zmienia tylko tekst (od bajtu 22).
+    Używa bazowego pakietu i zmienia tylko tekst (od bajtu 22),
+    następnie przelicza checksum.
 
     Args:
         text: Tekst do wyświetlenia (np. "00'01".111 A-1")
 
     Returns:
         Gotowy pakiet do wysłania
-
-    Note:
-        Tablica NIE sprawdza checksum, więc możemy zmienić tylko tekst!
     """
     packet = bytearray(BASE_PACKET)
+
     # Dopełnij tekstem spacjami do długości 36 (długość tekstu w pakiecie)
     text_padded = text.ljust(36)
+
     # Zastąp tekst od bajtu 22
     packet[22:22+36] = text_padded.encode('ascii', errors='replace')
+
+    # PRZELICZ CHECKSUM
+    # Wyzeruj pole CRC
+    packet[4] = 0
+    packet[5] = 0
+
+    # Oblicz CRC-16 na całym pakiecie
+    crc = calculate_crc16(bytes(packet))
+
+    # Wstaw CRC w formacie little-endian
+    packet[4] = crc & 0xFF
+    packet[5] = (crc >> 8) & 0xFF
+
     return bytes(packet)
 
 def send_init(ser, count=3):
