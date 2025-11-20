@@ -41,11 +41,12 @@ def calculate_crc16(data: bytes) -> int:
     return crc
 
 
-def create_time_packet_line1(time_str: str) -> bytes:
+def create_time_packet_line1(time_str: str, add_dash: bool = False) -> bytes:
     """
     Pakiet czasu dla linii 1
     Args:
         time_str: Czas w formacie "MM:SS.mmm"
+        add_dash: Czy dodać myślnik na końcu (domyślnie False)
     Returns:
         Pakiet bajtów do wysłania na tablicę
     """
@@ -62,7 +63,9 @@ def create_time_packet_line1(time_str: str) -> bytes:
     else:
         formatted = time_str
 
-    text_padded = (formatted + "  - ").ljust(34)[:34]
+    # Dodaj myślnik tylko jeśli add_dash=True
+    suffix = "  - " if add_dash else "  "
+    text_padded = (formatted + suffix).ljust(34)[:34]
     base[22:56] = text_padded.encode('ascii', errors='replace')
 
     base[4] = 0
@@ -74,11 +77,12 @@ def create_time_packet_line1(time_str: str) -> bytes:
     return bytes(base)
 
 
-def create_time_packet_line2(time_str: str) -> bytes:
+def create_time_packet_line2(time_str: str, add_dash: bool = False) -> bytes:
     """
     Pakiet czasu dla linii 2
     Args:
         time_str: Czas w formacie "MM:SS.mmm"
+        add_dash: Czy dodać myślnik na końcu (domyślnie False)
     Returns:
         Pakiet bajtów do wysłania na tablicę
     """
@@ -95,7 +99,9 @@ def create_time_packet_line2(time_str: str) -> bytes:
     else:
         formatted = time_str
 
-    text_padded = (formatted + "  - ").ljust(34)[:34]
+    # Dodaj myślnik tylko jeśli add_dash=True
+    suffix = "  - " if add_dash else "  "
+    text_padded = (formatted + suffix).ljust(34)[:34]
     base[22:56] = text_padded.encode('ascii', errors='replace')
 
     base[4] = 0
@@ -658,18 +664,18 @@ class ChronometerManager:
             # Wyślij tekst na linię 1
             if text1:
                 packet1 = create_time_packet_line1(text1)
-                self.led_manager.display.send_packet(packet1, delay=0.05)
+                self.led_manager.display.send_packet(packet1, delay=0.1)  # Zwiększone opóźnienie
             else:
                 # Jeśli puste, wyczyść linię 1
-                self.led_manager.display.send_packet('clear_line1', delay=0.05)
+                self.led_manager.display.send_packet('clear_line1', delay=0.1)
 
             # Wyślij tekst na linię 2
             if text2:
                 packet2 = create_time_packet_line2(text2)
-                self.led_manager.display.send_packet(packet2, delay=0.05)
+                self.led_manager.display.send_packet(packet2, delay=0.1)  # Zwiększone opóźnienie
             else:
                 # Jeśli puste, wyczyść linię 2
-                self.led_manager.display.send_packet('clear_line2', delay=0.05)
+                self.led_manager.display.send_packet('clear_line2', delay=0.1)
 
             print(f"📺 LED: Wysłano tekst statyczny - Linia 1: '{text1}', Linia 2: '{text2}'")
             messagebox.showinfo("LED", f"Wysłano tekst:\nLinia 1: {text1 or '(puste)'}\nLinia 2: {text2 or '(puste)'}")
@@ -2345,7 +2351,7 @@ class ChronometerManager:
     def update_live_timer(self):
         """Live timer"""
         if self.timer_running and self.start_absolute_time:
-            elapsed = time.time() - self.start_absolute_time
+            elapsed = time.time() - self.start_absolute_time + 0.10  # Korekcja +0.10s
             self.timer_label.config(text=self.format_time_mmss(elapsed), fg='#4CAF50')
 
             # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (OSF) ===
@@ -2367,7 +2373,7 @@ class ChronometerManager:
                         time_str = self.format_time_mmss(elapsed)
                         packet1 = create_time_packet_line1(time_str)
 
-                    self.led_manager.display.send_packet(packet1, delay=0)
+                    self.led_manager.display.send_packet(packet1, delay=0.05)  # Opóźnienie przed linią 2
 
                     # LINIA 2 (PRAWY TOR)
                     if self.right_lane_finished and self.right_lane_result is not None:
@@ -2379,7 +2385,7 @@ class ChronometerManager:
                         time_str = self.format_time_mmss(elapsed)
                         packet2 = create_time_packet_line2(time_str)
 
-                    self.led_manager.display.send_packet(packet2, delay=0)
+                    self.led_manager.display.send_packet(packet2, delay=0)  # Bez opóźnienia po linii 2
                 else:
                     # TRYBY POJEDYNCZE - jeden zegar
                     time_str = self.format_time_mmss(elapsed)
@@ -2392,7 +2398,7 @@ class ChronometerManager:
             self.timer_label.config(text="00:00.00", fg='#9E9E9E')
 
         if self.la_race_active and self.la_start_absolute_time:
-            elapsed_la = time.time() - self.la_start_absolute_time
+            elapsed_la = time.time() - self.la_start_absolute_time + 0.10  # Korekcja +0.10s
             self.la_timer_label.config(text=self.format_time_mmss(elapsed_la), fg='#4CAF50')
 
             # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (LA) ===
@@ -2401,7 +2407,7 @@ class ChronometerManager:
 
                 # Wyświetl na obu liniach dla lepszej widoczności
                 packet = create_time_packet_line1(time_str)
-                self.led_manager.display.send_packet(packet, delay=0)
+                self.led_manager.display.send_packet(packet, delay=0.05 if self.la_num_athletes >= 2 else 0)
 
                 if self.la_num_athletes >= 2:
                     packet2 = create_time_packet_line2(time_str)
