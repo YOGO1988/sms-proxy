@@ -22,27 +22,6 @@ import struct
 from typing import List, Tuple, Optional
 
 
-def calculate_crc16(data: bytes) -> int:
-    """
-    Obliczanie CRC16 MODBUS
-
-    Args:
-        data: Dane do obliczenia CRC
-
-    Returns:
-        CRC16 jako int (16-bit)
-    """
-    crc = 0xFFFF
-    for byte in data:
-        crc ^= byte
-        for _ in range(8):
-            if crc & 0x0001:
-                crc = (crc >> 1) ^ 0xA001
-            else:
-                crc >>= 1
-    return crc
-
-
 class LEDDisplay:
     """
     Driver for Color-LED display
@@ -68,9 +47,13 @@ class LEDDisplay:
 
         'clear_line2': bytes.fromhex('1B 07 54 00 60 FC 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 2D 2D 2D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', '')),
 
-        # Brightness packets (from user's log)
+        # Brightness packets (from working program - VERIFIED!)
+        # Values 0-15 (16 levels), where 0=off, 15=max
         'brightness_0': bytes.fromhex('1B 06 0C 00 FB E8 00 00 00 00 0D 0A'.replace(' ', '')),
+        'brightness_3': bytes.fromhex('1B 06 0C 00 27 73 00 00 03 00 0D 0A'.replace(' ', '')),
+        'brightness_8': bytes.fromhex('1B 06 0C 00 38 6D 00 00 08 00 0D 0A'.replace(' ', '')),
         'brightness_9': bytes.fromhex('1B 06 0C 00 8C 1B 00 00 09 00 0D 0A'.replace(' ', '')),
+        'brightness_12': bytes.fromhex('1B 06 0C 00 C9 A7 00 00 0C 00 0D 0A'.replace(' ', '')),
         'brightness_15': bytes.fromhex('1B 06 0C 00 15 3C 00 00 0F 00 0D 0A'.replace(' ', '')),
     }
 
@@ -133,33 +116,6 @@ class LEDDisplay:
             print(f"❌ Błąd wysyłania: {e}")
             return False
 
-    def create_brightness_packet(self, brightness: int) -> bytes:
-        """
-        Create brightness control packet
-
-        Args:
-            brightness: 0-100 (percentage)
-
-        Returns:
-            Complete packet with CRC
-        """
-        # Clamp brightness to 0-100
-        brightness = max(0, min(100, brightness))
-
-        # Packet structure: 1B 06 0C 00 [CRC_L] [CRC_H] 00 00 [BRIGHTNESS] 00 0D 0A
-        # Data for CRC calculation (without ESC, CRC itself, and CRLF)
-        data = bytes([0x06, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, brightness, 0x00])
-
-        # Calculate CRC16
-        crc = calculate_crc16(data)
-        crc_low = crc & 0xFF
-        crc_high = (crc >> 8) & 0xFF
-
-        # Build complete packet
-        packet = bytes([0x1B, 0x06, 0x0C, 0x00, crc_low, crc_high, 0x00, 0x00, brightness, 0x00, 0x0D, 0x0A])
-
-        return packet
-
     def set_brightness(self, brightness: int):
         """
         Ustawienie jasności tablicy
@@ -168,25 +124,45 @@ class LEDDisplay:
             brightness: Jasność 0-100 (%)
                        0 = wyłączone (czarne)
                        100 = maksymalna jasność
+
+        Note:
+            Display supports 16 brightness levels (0-15)
+            Percentage is mapped to nearest available level
         """
         brightness = max(0, min(100, brightness))
 
         print(f"💡 Ustawianie jasności: {brightness}%")
 
-        # Use predefined packets for known values
+        # Map percentage (0-100) to hardware level (0-15)
+        # Available verified packets: 0, 3, 8, 9, 12, 15
         if brightness == 0:
-            result = self.send_packet('brightness_0')
-        elif brightness == 9:
-            result = self.send_packet('brightness_9')
-        elif brightness == 15:
-            result = self.send_packet('brightness_15')
-        else:
-            # Calculate packet for other values
-            packet = self.create_brightness_packet(brightness)
-            result = self.send_packet(packet)
+            level = 0
+        elif brightness <= 13:  # 0-13% -> level 0
+            level = 0
+        elif brightness <= 33:  # 14-33% -> level 3
+            level = 3
+        elif brightness <= 60:  # 34-60% -> level 8
+            level = 8
+        elif brightness <= 73:  # 61-73% -> level 9
+            level = 9
+        elif brightness < 100:  # 74-99% -> level 12
+            level = 12
+        else:  # 100% -> level 15
+            level = 15
+
+        # Use predefined packet for this level
+        packet_name = f'brightness_{level}'
+
+        if packet_name not in self.PACKETS:
+            print(f"⚠️  Poziom {level} nie jest dostępny, używam najbliższego")
+            level = 15
+            packet_name = 'brightness_15'
+
+        result = self.send_packet(packet_name)
 
         if result:
             self.current_brightness = brightness
+            print(f"   ✅ Ustawiono poziom sprzętowy: {level}/15")
 
         return result
 
@@ -347,6 +323,10 @@ class LEDDisplayManager:
 
         index = 0
         while self.rotation_active:
+            # CLEAR DISPLAY BEFORE SHOWING NEW PAIR
+            self.display.clear_display()
+            time.sleep(0.2)
+
             # Get current pair (2 results)
             pair = results[index:index+2]
 
