@@ -484,11 +484,7 @@ class LEDDisplayManager:
 
             time_str = f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
-            # Update display with current time
-            self.display.clear_display()
-            time.sleep(0.05)
-
-            # Show time on line 1
+            # Show time on line 1 (without clearing - just overwrite)
             packet = create_time_packet_line1(time_str)
             self.display.send_packet(packet)
 
@@ -547,21 +543,23 @@ class LEDDisplayManager:
         """
         print(f"🔄 Tryb rankingowy: {len(results)} zawodników")
 
+        # Clear display ONCE at the start, not in the loop
+        self.display.clear_display()
+        time.sleep(0.2)
+
         index = 0
         while self.rotation_active:
-            # CLEAR DISPLAY BEFORE SHOWING NEW PAIR
-            self.display.clear_display()
-            time.sleep(0.2)
-
             # Get current pair (2 results)
             pair = results[index:index+2]
 
             if len(pair) == 1:
-                # Single result - show on line 1
+                # Single result - show on line 1, clear line 2
                 place = index + 1
                 time_str = pair[0].get('time', '00:00.000')
                 print(f"  📊 Miejsce {place}: {time_str}")
                 self.display.show_time_with_place(time_str, place, line=1)
+                time.sleep(0.05)
+                self.display.send_packet('clear_line2')
 
             elif len(pair) == 2:
                 # Two results - show both with place numbers
