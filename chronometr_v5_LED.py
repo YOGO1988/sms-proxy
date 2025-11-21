@@ -2541,13 +2541,13 @@ class ChronometerManager:
                                         MeasurementMode.OSF_DRUZYNA,
                                         MeasurementMode.WACHADLO]:
                     # KLUCZOWA NAPRAWA: ZAWSZE wysyłaj pakiety co 50ms dla pełnej synchronizacji!
-                    # Dla torów biegnących: wysyłaj czas bieżący
-                    # Dla torów zakończonych: CIĄGLE wysyłaj czas finałowy (tak jak w LA!)
-                    # UŻYWAMY PAKIETÓW FINAŁOWYCH (0x3E) ŻEBY POKAZAĆ NAZWY TORÓW
+                    # Dla torów biegnących: wysyłaj ZWYKŁE PAKIETY CZASU (0x3A) - jak w LA
+                    # Dla torów zakończonych: wysyłaj PAKIETY FINAŁOWE (0x3E) z nazwami torów
+                    # To zapobiega nadpisywaniu wyników przez biegnący timer!
 
                     if not self.left_lane_finished:
-                        # TOR 1 (linia 1) - nadal biegnie, POKAZUJ NAZWĘ "TOR 1"
-                        packet1 = create_finish_packet_line1(time_str_formatted)
+                        # TOR 1 (linia 1) - nadal biegnie, WYSYŁAJ ZWYKŁY PAKIET CZASU (jak w LA!)
+                        packet1 = create_time_packet_line1(time_str_formatted)
                         self.led_manager.display.send_packet(packet1, delay=0.02)
                     elif self.left_lane_result is not None:
                         # TOR 1 zakończony - CIĄGLE wysyłaj czas finałowy dla synchronizacji!
@@ -2556,8 +2556,8 @@ class ChronometerManager:
                         self.led_manager.display.send_packet(packet1, delay=0.02)
 
                     if not self.right_lane_finished:
-                        # TOR 2 (linia 2) - nadal biegnie, POKAZUJ NAZWĘ "TOR 2"
-                        packet2 = create_finish_packet_line2(time_str_formatted)
+                        # TOR 2 (linia 2) - nadal biegnie, WYSYŁAJ ZWYKŁY PAKIET CZASU (jak w LA!)
+                        packet2 = create_time_packet_line2(time_str_formatted)
                         self.led_manager.display.send_packet(packet2, delay=0)
                     elif self.right_lane_result is not None:
                         # TOR 2 zakończony - CIĄGLE wysyłaj czas finałowy dla synchronizacji!
