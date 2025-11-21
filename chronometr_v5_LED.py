@@ -41,12 +41,13 @@ def calculate_crc16(data: bytes) -> int:
     return crc
 
 
-def create_time_packet_line1(time_str: str, add_dash: bool = False) -> bytes:
+def create_time_packet_line1(time_str: str, add_dash: bool = False, lane_name: str = None) -> bytes:
     """
     Pakiet czasu dla linii 1
     Args:
         time_str: Czas w formacie "MM:SS.mmm"
         add_dash: Czy dodać myślnik na końcu (domyślnie False)
+        lane_name: Nazwa toru do wyświetlenia (np. "TOR 1", opcjonalnie)
     Returns:
         Pakiet bajtów do wysłania na tablicę
     """
@@ -63,8 +64,14 @@ def create_time_packet_line1(time_str: str, add_dash: bool = False) -> bytes:
     else:
         formatted = time_str
 
-    # Dodaj myślnik tylko jeśli add_dash=True
-    suffix = "  - " if add_dash else "  "
+    # Dodaj nazwę toru jeśli podana, w przeciwnym razie myślnik lub spacje
+    if lane_name:
+        suffix = f" {lane_name} "
+    elif add_dash:
+        suffix = "  - "
+    else:
+        suffix = "  "
+
     text_padded = (formatted + suffix).ljust(34)[:34]
     base[22:56] = text_padded.encode('ascii', errors='replace')
 
@@ -77,12 +84,13 @@ def create_time_packet_line1(time_str: str, add_dash: bool = False) -> bytes:
     return bytes(base)
 
 
-def create_time_packet_line2(time_str: str, add_dash: bool = False) -> bytes:
+def create_time_packet_line2(time_str: str, add_dash: bool = False, lane_name: str = None) -> bytes:
     """
     Pakiet czasu dla linii 2
     Args:
         time_str: Czas w formacie "MM:SS.mmm"
         add_dash: Czy dodać myślnik na końcu (domyślnie False)
+        lane_name: Nazwa toru do wyświetlenia (np. "TOR 2", opcjonalnie)
     Returns:
         Pakiet bajtów do wysłania na tablicę
     """
@@ -99,8 +107,14 @@ def create_time_packet_line2(time_str: str, add_dash: bool = False) -> bytes:
     else:
         formatted = time_str
 
-    # Dodaj myślnik tylko jeśli add_dash=True
-    suffix = "  - " if add_dash else "  "
+    # Dodaj nazwę toru jeśli podana, w przeciwnym razie myślnik lub spacje
+    if lane_name:
+        suffix = f" {lane_name} "
+    elif add_dash:
+        suffix = "  - "
+    else:
+        suffix = "  "
+
     text_padded = (formatted + suffix).ljust(34)[:34]
     base[22:56] = text_padded.encode('ascii', errors='replace')
 
@@ -1890,6 +1904,17 @@ class ChronometerManager:
 
                     self.la_add_to_history()
 
+                    # === WYŚWIETL RANKING NA LED ===
+                    if self.led_enabled and self.led_manager:
+                        race_data = {
+                            'results': [
+                                {'time': self.format_time_mmss(t), 'place': i+1}
+                                for i, t in enumerate(self.la_results)
+                            ]
+                        }
+                        self.led_manager.update_race_results(race_data)
+                        print(f"📺 LED: Ranking LA wyświetlony - {len(self.la_results)} zawodników")
+
                     if self.la_log_file:
                         self.la_log_file.write(f"\n{'='*60}\nZAKOŃCZONY\n{'='*60}\n\n")
                         self.la_log_file.flush()
@@ -2072,8 +2097,20 @@ class ChronometerManager:
 
                 self.update_osf_display()
 
-                # === NIEZALEŻNE ZEGARY - WYNIKI WYŚWIETLANE NATYCHMIAST W update_live_timer ===
-                # Nie czekamy na oba tory - każdy tor pokazuje wynik jak skończy
+        # === ZATRZYMAJ TIMER GDY OBA TORY SKOŃCZĄ ===
+        if self.left_lane_finished and self.right_lane_finished:
+            if self.timer_running:
+                self.timer_running = False
+                self.race_completed = False
+                self.next_race_btn.config(state='normal')
+
+                # Ustaw timer_label na maksymalny czas z obu torów
+                max_time = max(self.left_lane_result, self.right_lane_result)
+                self.timer_label.config(text=self.format_time_mmss(max_time))
+                print(f"⏱️  OSF DWA TORY: Oba tory skończone - timer zatrzymany na {self.format_time_mmss(max_time)}")
+
+        # === NIEZALEŻNE ZEGARY - WYNIKI WYŚWIETLANE NATYCHMIAST W update_live_timer ===
+        # Nie czekamy na oba tory - każdy tor pokazuje wynik jak skończy
 
     def update_osf_display(self):
         """Aktualizacja wyświetlania OSF DWA TORY"""
@@ -2541,13 +2578,13 @@ class ChronometerManager:
                                         MeasurementMode.OSF_DRUZYNA,
                                         MeasurementMode.WACHADLO]:
                     # KLUCZOWA NAPRAWA: ZAWSZE wysyłaj pakiety co 50ms dla pełnej synchronizacji!
-                    # Dla torów biegnących: wysyłaj ZWYKŁE PAKIETY CZASU (0x3A) - jak w LA
+                    # Dla torów biegnących: wysyłaj ZWYKŁE PAKIETY CZASU (0x3A) Z NAZWAMI TORÓW
                     # Dla torów zakończonych: wysyłaj PAKIETY FINAŁOWE (0x3E) z nazwami torów
                     # To zapobiega nadpisywaniu wyników przez biegnący timer!
 
                     if not self.left_lane_finished:
-                        # TOR 1 (linia 1) - nadal biegnie, WYSYŁAJ ZWYKŁY PAKIET CZASU (jak w LA!)
-                        packet1 = create_time_packet_line1(time_str_formatted)
+                        # TOR 1 (linia 1) - nadal biegnie, WYSYŁAJ PAKIET CZASU Z NAZWĄ TORU
+                        packet1 = create_time_packet_line1(time_str_formatted, lane_name="TOR 1")
                         self.led_manager.display.send_packet(packet1, delay=0.02)
                     elif self.left_lane_result is not None:
                         # TOR 1 zakończony - CIĄGLE wysyłaj czas finałowy dla synchronizacji!
@@ -2556,8 +2593,8 @@ class ChronometerManager:
                         self.led_manager.display.send_packet(packet1, delay=0.02)
 
                     if not self.right_lane_finished:
-                        # TOR 2 (linia 2) - nadal biegnie, WYSYŁAJ ZWYKŁY PAKIET CZASU (jak w LA!)
-                        packet2 = create_time_packet_line2(time_str_formatted)
+                        # TOR 2 (linia 2) - nadal biegnie, WYSYŁAJ PAKIET CZASU Z NAZWĄ TORU
+                        packet2 = create_time_packet_line2(time_str_formatted, lane_name="TOR 2")
                         self.led_manager.display.send_packet(packet2, delay=0)
                     elif self.right_lane_result is not None:
                         # TOR 2 zakończony - CIĄGLE wysyłaj czas finałowy dla synchronizacji!
