@@ -41,6 +41,64 @@ def calculate_crc16(data: bytes) -> int:
     return crc
 
 
+def create_init_packet_line1(lane_text: str = "TOR 1    0)") -> bytes:
+    """
+    Pakiet inicjalizacyjny 0xE8 dla linii 1 (TOR 1)
+    Wyświetla tekst na linii 1 (Y=0) przed startem wyścigu
+    Args:
+        lane_text: Tekst do wyświetlenia (np. "TOR 1    0)")
+    Returns:
+        Pakiet bajtów inicjalizacyjny dla toru 1
+    """
+    # Bazowy pakiet 0xE8 dla linii 1 (Y=0)
+    base = bytearray.fromhex('1B 08 E8 00 E4 92 00 00 01 00 00 00 00 00 00 00 01 00 0A 00 00 00 00 00 00 00 00 00 00 00'.replace(' ', ''))
+
+    # Dodaj tekst (max 34 znaki + padding)
+    text_padded = lane_text.ljust(170)[:170]  # Dopełnij do 170 znaków jak w oryginalnym pakiecie
+    base.extend(text_padded.encode('ascii', errors='replace'))
+    base.extend(b'\r\n')
+
+    # Przelicz CRC
+    base[4] = 0
+    base[5] = 0
+    crc = calculate_crc16(bytes(base))
+    base[4] = crc & 0xFF
+    base[5] = (crc >> 8) & 0xFF
+
+    return bytes(base)
+
+
+def create_init_packet_line2(lane_text: str = "TOR 2    0)") -> bytes:
+    """
+    Pakiet inicjalizacyjny 0xE8 dla linii 2 (TOR 2)
+    Wyświetla tekst na linii 2 (Y=16) przed startem wyścigu
+    Args:
+        lane_text: Tekst do wyświetlenia (np. "TOR 2    0)")
+    Returns:
+        Pakiet bajtów inicjalizacyjny dla toru 2
+    """
+    # Bazowy pakiet 0xE8 dla linii 2 (Y=16 = 0x10)
+    # Różnice względem linii 1:
+    # - byte 16: 0x02 (lane number = 2)
+    # - byte 22: 0x10 (Y position = 16)
+    # - byte 28: 0x38 (możliwe offset X = 56)
+    base = bytearray.fromhex('1B 08 E8 00 F8 77 00 00 01 00 00 00 00 00 00 00 02 00 0A 00 00 00 10 00 00 00 00 00 38 00'.replace(' ', ''))
+
+    # Dodaj tekst (max 34 znaki + padding)
+    text_padded = lane_text.ljust(170)[:170]  # Dopełnij do 170 znaków
+    base.extend(text_padded.encode('ascii', errors='replace'))
+    base.extend(b'\r\n')
+
+    # Przelicz CRC
+    base[4] = 0
+    base[5] = 0
+    crc = calculate_crc16(bytes(base))
+    base[4] = crc & 0xFF
+    base[5] = (crc >> 8) & 0xFF
+
+    return bytes(base)
+
+
 def create_time_packet_line1(time_str: str, add_dash: bool = False, lane_name: str = None) -> bytes:
     """
     Pakiet czasu dla linii 1
@@ -976,8 +1034,8 @@ class ChronometerManager:
         tk.Label(row1, text="Zawodnicy:", font=('Arial', 10, 'bold'), bg='white').pack(side=tk.LEFT, padx=3)
         
         self.la_athletes_var = tk.IntVar(value=2)
-        self.la_athletes_combo = ttk.Combobox(row1, textvariable=self.la_athletes_var, 
-                                              values=list(range(2, 21)), width=4, state='readonly',
+        self.la_athletes_combo = ttk.Combobox(row1, textvariable=self.la_athletes_var,
+                                              values=list(range(1, 21)), width=4, state='readonly',
                                               font=('Arial', 10))
         self.la_athletes_combo.pack(side=tk.LEFT, padx=3)
         self.la_athletes_combo.bind('<<ComboboxSelected>>', self.on_la_config_change)
@@ -1985,13 +2043,18 @@ class ChronometerManager:
                     # KRYTYCZNA SEKCJA - wyślij ostatni pakiet PRZED ustawieniem flagi!
                     self.left_lane_result = result_time
 
-                    # === NAPRAWA RACE CONDITION: Wyślij ostatni pakiet PRZED ustawieniem flagi finished ===
+                    # === NAPRAWA RACE CONDITION: Wyślij pakiety czyszczące i ostatni pakiet PRZED ustawieniem flagi finished ===
                     if self.led_enabled and self.led_manager and self.led_manager.display.connected:
+                        # Najpierw wyślij pakiety czyszczące 0xE8 (jak w oryginalnym programie)
+                        clear_packet1 = create_init_packet_line1("")  # Pusty tekst
+                        for _ in range(2):
+                            self.led_manager.display.send_packet(clear_packet1, delay=0.01)
+
                         result_str = self.format_time_mmss(result_time)
-                        # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
-                        for _ in range(3):
+                        # Wyślij pakiet z czasem WIELOKROTNIE dla pewności (race condition z update_live_timer)
+                        for _ in range(6):  # Zwiększono z 3 do 6
                             packet1 = create_time_packet_line1(result_str, add_dash=False)
-                            self.led_manager.display.send_packet(packet1, delay=0.02)
+                            self.led_manager.display.send_packet(packet1, delay=0.03)
                         print(f"📺 LED: POJEDYNCZY (kanał 4) wysłano ostatni pakiet - time={result_time:.4f}s, formatted={result_str}")
 
                     # DOPIERO TERAZ ustaw flagę finished (update_live_timer będzie kontynuować wysyłanie tego czasu)
@@ -2015,9 +2078,15 @@ class ChronometerManager:
             if not self.ready_for_start:
                 return
 
-            # === WYCZYŚĆ LED PRZY STARCIE ===
+            # === WYCZYŚĆ LED PRZY STARCIE I WYŚLIJ PAKIETY INICJALIZACYJNE ===
             if self.led_enabled and self.led_manager:
                 self.led_manager.display.clear_display()
+                # Wyślij pakiety inicjalizacyjne dla obu torów (0xE8)
+                init_packet1 = create_init_packet_line1("TOR 1    0)")
+                init_packet2 = create_init_packet_line2("TOR 2    0)")
+                self.led_manager.display.send_packet(init_packet1, delay=0.05)
+                self.led_manager.display.send_packet(init_packet2, delay=0.05)
+                print(f"📺 LED: Wysłano pakiety inicjalizacyjne dla obu torów")
 
             self.start_time = time_seconds
             self.start_absolute_time = time.time()
@@ -2184,9 +2253,15 @@ class ChronometerManager:
             if not self.ready_for_start:
                 return
 
-            # === WYCZYŚĆ LED PRZY STARCIE ===
+            # === WYCZYŚĆ LED PRZY STARCIE I WYŚLIJ PAKIETY INICJALIZACYJNE ===
             if self.led_enabled and self.led_manager:
                 self.led_manager.display.clear_display()
+                # Wyślij pakiety inicjalizacyjne dla obu torów (0xE8)
+                init_packet1 = create_init_packet_line1("TOR 1    0)")
+                init_packet2 = create_init_packet_line2("TOR 2    0)")
+                self.led_manager.display.send_packet(init_packet1, delay=0.05)
+                self.led_manager.display.send_packet(init_packet2, delay=0.05)
+                print(f"📺 LED: Wysłano pakiety inicjalizacyjne dla obu torów (OSF DRUŻYNA)")
 
             self.start_time = time_seconds
             self.start_absolute_time = time.time()
@@ -2346,9 +2421,15 @@ class ChronometerManager:
             if not self.ready_for_start:
                 return
 
-            # === WYCZYŚĆ LED PRZY STARCIE ===
+            # === WYCZYŚĆ LED PRZY STARCIE I WYŚLIJ PAKIETY INICJALIZACYJNE ===
             if self.led_enabled and self.led_manager:
                 self.led_manager.display.clear_display()
+                # Wyślij pakiety inicjalizacyjne dla obu torów (0xE8)
+                init_packet1 = create_init_packet_line1("TOR 1    0)")
+                init_packet2 = create_init_packet_line2("TOR 2    0)")
+                self.led_manager.display.send_packet(init_packet1, delay=0.05)
+                self.led_manager.display.send_packet(init_packet2, delay=0.05)
+                print(f"📺 LED: Wysłano pakiety inicjalizacyjne dla obu torów (WACHADŁO)")
 
             self.start_time = time_seconds
             self.start_absolute_time = time.time()
@@ -2662,40 +2743,35 @@ class ChronometerManager:
                     # Tylko wyświetlamy czasy finałowe gdy skończą (wysyłane w handle_osf_druzyna)
                     pass
 
-                # TRYBY Z DWOMA TORAMI (oprócz OSF_DRUZYNA) - nowa logika wyświetlania
+                # TRYBY Z DWOMA TORAMI (oprócz OSF_DRUZYNA) - NAPRAWIONA LOGIKA
                 elif self.current_mode in [MeasurementMode.OSF_DWA_TORY, MeasurementMode.WACHADLO]:
-                    # === NOWA LOGIKA WYŚWIETLANIA (przywrócona z wcześniejszej wersji) ===
-                    # Podczas biegu (oba tory biegną): tylko linia 1 pokazuje bieżący czas
-                    # Gdy skończy tor 1: linia 1 pokazuje czas toru 1 (z nazwą)
-                    # Gdy skończy tor 2: linia 2 pokazuje czas toru 2 (z nazwą)
+                    # === NAPRAWIONA LOGIKA WYŚWIETLANIA (zgodna z oryginalnym programem) ===
+                    # Podczas biegu (oba tory biegną): OBA TORY pokazują ten sam bieżący czas JEDNOCZEŚNIE
+                    # Gdy skończy tor 1: linia 1 pokazuje czas finałowy toru 1 (z nazwą "TOR 1")
+                    # Gdy skończy tor 2: linia 2 pokazuje czas finałowy toru 2 (z nazwą "TOR 2")
 
                     packet1 = None
                     packet2 = None
 
                     # LINIA 1 - TOR 1
                     if not self.left_lane_finished:
-                        # TOR 1 nadal biegnie
-                        # Jeśli TOR 2 też biegnie - pokaż bieżący czas na linii 1 (wspólny dla obu)
-                        # Jeśli TOR 2 już skończył - pokaż bieżący czas na linii 1 (dla toru 1)
-                        if not self.right_lane_finished:
-                            # Oba tory biegną - pokaż bieżący czas tylko na linii 1 (bez nazwy toru)
-                            packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
-                        else:
-                            # TOR 2 skończył, TOR 1 nadal biegnie - pokaż bieżący czas na linii 1
-                            packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
+                        # TOR 1 nadal biegnie - pokaż bieżący czas na linii 1
+                        packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
                     elif self.left_lane_result is not None:
                         # TOR 1 zakończony - pokaż czas finałowy na linii 1 (z nazwą toru)
                         result_str = self.format_time_mmss(self.left_lane_result)
                         packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
 
                     # LINIA 2 - TOR 2
-                    if self.right_lane_result is not None:
+                    if not self.right_lane_finished:
+                        # TOR 2 nadal biegnie - pokaż bieżący czas na linii 2 (ten sam co linia 1!)
+                        packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
+                    elif self.right_lane_result is not None:
                         # TOR 2 zakończony - pokaż czas finałowy na linii 2 (z nazwą toru)
                         result_str = self.format_time_mmss(self.right_lane_result)
                         packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
-                    # Jeśli TOR 2 nadal biegnie - nie pokazuj nic na linii 2
 
-                    # WYŚLIJ PAKIETY
+                    # WYŚLIJ PAKIETY NA OBU LINIACH JEDNOCZEŚNIE
                     if packet1:
                         self.led_manager.display.send_packet(packet1, delay=0)
                     if packet2:
