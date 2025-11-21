@@ -2239,13 +2239,9 @@ class ChronometerManager:
             display += f"⏳ TOR 2: czekam..."
 
         self.update_display(display)
-
-        if self.left_lane_finished and self.right_lane_finished:
-            self.timer_running = False
-            self.race_completed = False
-            self.next_race_btn.config(state='normal')
-            max_time = max(self.left_lane_result, self.right_lane_result)
-            self.timer_label.config(text=self.format_time_mmss(max_time))
+        # === UWAGA: NIE zatrzymuj timer_running tutaj! ===
+        # Timer musi działać dalej aby update_live_timer() wysyłał pakiety LED
+        # Zatrzymanie odbywa się w handle_osf_dwa_tory() po ustawieniu race_completed
 
     def handle_osf_druzyna(self, channel, time_seconds):
         """OSF DRUŻYNA"""
@@ -2737,14 +2733,10 @@ class ChronometerManager:
             # KLUCZOWA NAPRAWA: Kontynuuj wysyłanie pakietów LED co 50ms nawet po zakończeniu
             # (analogicznie do LA gdzie pakiety są wysyłane ciągle przez cały czas)
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                # OSF DRUŻYNA - NIE WYŚWIETLAJ CZASU (tylko licznik zawodników w GUI)
-                if self.current_mode == MeasurementMode.OSF_DRUZYNA:
-                    # W trybie drużynowym nie wyświetlamy bieżącego czasu na LED
-                    # Tylko wyświetlamy czasy finałowe gdy skończą (wysyłane w handle_osf_druzyna)
-                    pass
-
-                # TRYBY Z DWOMA TORAMI (oprócz OSF_DRUZYNA) - NAPRAWIONA LOGIKA
-                elif self.current_mode in [MeasurementMode.OSF_DWA_TORY, MeasurementMode.WACHADLO]:
+                # TRYBY Z DWOMA TORAMI - NAPRAWIONA LOGIKA (OSF_DWA_TORY, OSF_DRUZYNA, WACHADLO)
+                # NAPRAWA: Dodano OSF_DRUZYNA do tej listy, aby oba tory były aktualizowane
+                # podczas i po biegu. Poprzednio OSF_DRUZYNA miała 'pass', co blokowało wyświetlanie.
+                if self.current_mode in [MeasurementMode.OSF_DWA_TORY, MeasurementMode.OSF_DRUZYNA, MeasurementMode.WACHADLO]:
                     # === NAPRAWIONA LOGIKA WYŚWIETLANIA (zgodna z oryginalnym programem) ===
                     # Podczas biegu (oba tory biegną): OBA TORY pokazują ten sam bieżący czas JEDNOCZEŚNIE
                     # Gdy skończy tor 1: linia 1 pokazuje czas finałowy toru 1 (z nazwą "TOR 1")
