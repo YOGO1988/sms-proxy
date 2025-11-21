@@ -1155,6 +1155,13 @@ class ChronometerManager:
     def on_tab_change(self, event):
         """Zmiana zakładki"""
         current_tab = self.notebook.index(self.notebook.select())
+
+        # === WYCZYŚĆ LED PRZY ZMIANIE TRYBU (OSF <-> LA) ===
+        if self.led_enabled and self.led_manager:
+            self.led_manager.stop_rotation()
+            self.led_manager.display.clear_display()
+            print("🧹 LED: Wyczyszczono przy zmianie trybu (OSF <-> LA)")
+
         if current_tab == 1:
             self.la_mode = True
         else:
@@ -1953,6 +1960,9 @@ class ChronometerManager:
 
             self.left_lane_crossings = []
             self.osf_all_left_crossings = []
+            self.left_lane_result = None
+            self.left_lane_finished = False
+
             self.race_number += 1
             self.count_label.config(text=str(self.race_number))
             self.osf_manage_btn.config(state='normal')
@@ -1967,6 +1977,21 @@ class ChronometerManager:
                 self.osf_all_left_crossings.append((result_time, is_blocked))
 
                 if not is_blocked and len(self.left_lane_crossings) < 1:
+                    # KRYTYCZNA SEKCJA - wyślij ostatni pakiet PRZED ustawieniem flagi!
+                    self.left_lane_result = result_time
+
+                    # === NAPRAWA RACE CONDITION: Wyślij ostatni pakiet PRZED ustawieniem flagi finished ===
+                    if self.led_enabled and self.led_manager and self.led_manager.display.connected:
+                        result_str = self.format_time_mmss(result_time)
+                        # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
+                        for _ in range(3):
+                            packet1 = create_time_packet_line1(result_str, add_dash=False)
+                            self.led_manager.display.send_packet(packet1, delay=0.02)
+                        print(f"📺 LED: POJEDYNCZY (kanał 4) wysłano ostatni pakiet - time={result_time:.4f}s, formatted={result_str}")
+
+                    # DOPIERO TERAZ ustaw flagę finished (update_live_timer będzie kontynuować wysyłanie tego czasu)
+                    self.left_lane_finished = True
+
                     self.left_lane_crossings.append(result_time)
 
                     self.timer_running = False
@@ -1975,16 +2000,8 @@ class ChronometerManager:
                     self.add_measurement("POJEDYNCZY", "-", result_time)
                     self.next_race_btn.config(state='normal')
                     self.update_display(f"✅ ZAKOŃCZONY!\n\nCzas: {self.format_time(result_time)} s")
-                    
-                    # === INTEGRACJA LED DLA OSF POJEDYNCZY ===
-                    if self.led_enabled and self.led_manager:
-                        race_data = {
-                            'results': [
-                                {'time': self.format_time(result_time), 'place': 1}
-                            ]
-                        }
-                        self.led_manager.update_race_results(race_data)
-                        print(f"📺 LED: Wyświetlono wynik OSF POJEDYNCZY")
+
+                    print(f"✅ LED: POJEDYNCZY (kanał 4) zakończony - result_time={result_time:.4f}s")
 
     def handle_osf_dwa_tory(self, channel, time_seconds):
         """OSF DWA TORY"""
@@ -2637,36 +2654,49 @@ class ChronometerManager:
                                         MeasurementMode.OSF_DRUZYNA,
                                         MeasurementMode.WACHADLO]:
                     # ZAWSZE wysyłaj pakiety CZASU (0x3A) co 50ms dla pełnej synchronizacji!
-                    # Dla torów biegnących: wysyłaj bieżący czas z nazwą toru
+                    # Dla torów biegnących: wysyłaj bieżący czas z nazwą toru (jednocześnie na obu torach)
                     # Dla torów zakończonych: wysyłaj czas finałowy z nazwą toru
                     # To zapewnia ciągłą synchronizację (tak samo jak w LA)
+                    # Pakiety wysyłane są BEZ delay między nimi, żeby oba tory wyświetlały się równocześnie
+
+                    # WYSYŁAJ OBA PAKIETY JEDNOCZEŚNIE (bez delay między nimi)
+                    # Najpierw przygotuj oba pakiety, potem wyślij bez przerwy
+                    packet1 = None
+                    packet2 = None
 
                     if not self.left_lane_finished:
                         # TOR 1 (linia 1) - nadal biegnie, WYSYŁAJ PAKIET CZASU Z NAZWĄ TORU
                         packet1 = create_time_packet_line1(time_str_formatted, lane_name="TOR 1")
-                        self.led_manager.display.send_packet(packet1, delay=0.02)
                     elif self.left_lane_result is not None:
                         # TOR 1 zakończony - KONTYNUUJ wysyłanie pakietów CZASU (0x3A) z czasem finałowym
-                        # (tak jak w LA - używaj pakietów CZASU, nie finałowych!)
                         result_str = self.format_time_mmss(self.left_lane_result)
                         packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
-                        self.led_manager.display.send_packet(packet1, delay=0.02)
 
                     if not self.right_lane_finished:
                         # TOR 2 (linia 2) - nadal biegnie, WYSYŁAJ PAKIET CZASU Z NAZWĄ TORU
                         packet2 = create_time_packet_line2(time_str_formatted, lane_name="TOR 2")
-                        self.led_manager.display.send_packet(packet2, delay=0)
                     elif self.right_lane_result is not None:
                         # TOR 2 zakończony - KONTYNUUJ wysyłanie pakietów CZASU (0x3A) z czasem finałowym
-                        # (tak jak w LA - używaj pakietów CZASU, nie finałowych!)
                         result_str = self.format_time_mmss(self.right_lane_result)
                         packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
+
+                    # WYŚLIJ OBA PAKIETY JEDNOCZEŚNIE (bez delay między nimi dla równoczesnego wyświetlania)
+                    if packet1:
+                        self.led_manager.display.send_packet(packet1, delay=0)
+                    if packet2:
                         self.led_manager.display.send_packet(packet2, delay=0)
 
                 else:
-                    # TRYBY POJEDYNCZE - jeden zegar
-                    packet = create_time_packet_line1(time_str_formatted, add_dash=False)
-                    self.led_manager.display.send_packet(packet, delay=0)
+                    # TRYB POJEDYNCZY - jeden zegar z tą samą logiką co tryby dwóch torów
+                    if not self.left_lane_finished:
+                        # Bieg trwa - wysyłaj bieżący czas
+                        packet = create_time_packet_line1(time_str_formatted, add_dash=False)
+                        self.led_manager.display.send_packet(packet, delay=0)
+                    elif self.left_lane_result is not None:
+                        # Bieg zakończony - KONTYNUUJ wysyłanie pakietów CZASU z czasem finałowym
+                        result_str = self.format_time_mmss(self.left_lane_result)
+                        packet = create_time_packet_line1(result_str, add_dash=False)
+                        self.led_manager.display.send_packet(packet, delay=0)
 
         elif self.race_completed:
             self.timer_label.config(fg='#2196F3')
@@ -2730,6 +2760,13 @@ class ChronometerManager:
     def on_mode_change(self, event=None):
         """Zmiana trybu OSF"""
         mode_text = self.mode_var.get()
+
+        # === WYCZYŚĆ LED PRZY ZMIANIE TRYBU OSF ===
+        if self.led_enabled and self.led_manager:
+            self.led_manager.stop_rotation()
+            self.led_manager.display.clear_display()
+            print(f"🧹 LED: Wyczyszczono przy zmianie trybu OSF na {mode_text}")
+
         for mode in MeasurementMode:
             if mode.value == mode_text:
                 self.current_mode = mode
