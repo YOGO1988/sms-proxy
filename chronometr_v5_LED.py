@@ -2048,12 +2048,10 @@ class ChronometerManager:
                         timestamp
                     ), tags=('race',))
 
-                    # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 1 ===
-                    if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                        result_str = self.format_time_mmss(result_time)
-                        packet1 = create_finish_packet_line1(result_str)
-                        self.led_manager.display.send_packet(packet1, delay=0)
-                        print(f"📺 LED: TOR 1 (kanał 4) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
+                    # === NAPRAWA: Nie wysyłaj pakietów tutaj - pozwól update_live_timer() to obsłużyć ===
+                    # Usunięcie jednorazowego wysyłania aby uniknąć konfliktów
+                    # update_live_timer() będzie ciągle wysyłał pakiet finałowy co 50ms
+                    print(f"✅ LED: TOR 1 (kanał 4) zakończony - result_time={result_time:.4f}s")
 
                 self.update_osf_display()
 
@@ -2088,29 +2086,31 @@ class ChronometerManager:
                         timestamp
                     ), tags=('race',))
 
-                    # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 2 ===
-                    if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                        result_str = self.format_time_mmss(result_time)
-                        packet2 = create_finish_packet_line2(result_str)
-                        self.led_manager.display.send_packet(packet2, delay=0)
-                        print(f"📺 LED: TOR 2 (kanał 3) zakończony - result_time={result_time:.4f}s, formatted={result_str}")
+                    # === NAPRAWA: Nie wysyłaj pakietów tutaj - pozwól update_live_timer() to obsłużyć ===
+                    # Usunięcie jednorazowego wysyłania aby uniknąć konfliktów
+                    # update_live_timer() będzie ciągle wysyłał pakiet finałowy co 50ms
+                    print(f"✅ LED: TOR 2 (kanał 3) zakończony - result_time={result_time:.4f}s")
 
                 self.update_osf_display()
 
-        # === ZATRZYMAJ TIMER GDY OBA TORY SKOŃCZĄ ===
+        # === NAPRAWA: Gdy oba tory skończą - zaktualizuj GUI ale NIE zatrzymuj timer_running ===
+        # KLUCZOWA ZMIANA: Pozwól aby timer_running pozostał True, dzięki czemu
+        # update_live_timer() będzie CIĄGLE wysyłał pakiety finałowe co 50ms na LED
+        # (tak jak w LA gdzie la_race_active pozostaje True i wysyła pakiety do końca)
         if self.left_lane_finished and self.right_lane_finished:
-            if self.timer_running:
-                self.timer_running = False
-                self.race_completed = False
+            if not self.race_completed:
+                self.race_completed = True  # Ustaw flagę że bieg zakończony
                 self.next_race_btn.config(state='normal')
 
                 # Ustaw timer_label na maksymalny czas z obu torów
                 max_time = max(self.left_lane_result, self.right_lane_result)
                 self.timer_label.config(text=self.format_time_mmss(max_time))
-                print(f"⏱️  OSF DWA TORY: Oba tory skończone - timer zatrzymany na {self.format_time_mmss(max_time)}")
+                print(f"⏱️  OSF DWA TORY: Oba tory skończone - wyświetlam wyniki na LED")
+                print(f"   📺 TOR 1: {self.format_time_mmss(self.left_lane_result)}")
+                print(f"   📺 TOR 2: {self.format_time_mmss(self.right_lane_result)}")
 
-        # === NIEZALEŻNE ZEGARY - WYNIKI WYŚWIETLANE NATYCHMIAST W update_live_timer ===
-        # Nie czekamy na oba tory - każdy tor pokazuje wynik jak skończy
+        # === NIEZALEŻNE ZEGARY - WYNIKI WYŚWIETLANE CIĄGLE W update_live_timer ===
+        # Każdy tor pokazuje wynik natychmiast jak skończy i KONTYNUUJE wysyłanie co 50ms
 
     def update_osf_display(self):
         """Aktualizacja wyświetlania OSF DWA TORY"""
@@ -2232,12 +2232,8 @@ class ChronometerManager:
                 timestamp
             ), tags=('race',))
 
-            # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 1 ===
-            if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                result_str = self.format_time_mmss(left_time)
-                packet1 = create_finish_packet_line1(result_str)
-                self.led_manager.display.send_packet(packet1, delay=0)
-                print(f"📺 LED: TOR 1 (DRUŻYNA, kanał 4) zakończony - result_time={left_time:.4f}s, formatted={result_str}")
+            # === NAPRAWA: Nie wysyłaj pakietów tutaj - pozwól update_live_timer() to obsłużyć ===
+            print(f"✅ LED: TOR 1 (DRUŻYNA, kanał 4) zakończony - result_time={left_time:.4f}s")
 
         if len(self.right_lane_crossings) == 5 and self.right_lane_result is None:
             right_time = self.right_lane_crossings[-1]
@@ -2263,23 +2259,23 @@ class ChronometerManager:
                 timestamp
             ), tags=('race',))
 
-            # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 2 ===
-            if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                result_str = self.format_time_mmss(right_time)
-                packet2 = create_finish_packet_line2(result_str)
-                self.led_manager.display.send_packet(packet2, delay=0)
-                print(f"📺 LED: TOR 2 (DRUŻYNA, kanał 3) zakończony - result_time={right_time:.4f}s, formatted={result_str}")
+            # === NAPRAWA: Nie wysyłaj pakietów tutaj - pozwól update_live_timer() to obsłużyć ===
+            print(f"✅ LED: TOR 2 (DRUŻYNA, kanał 3) zakończony - result_time={right_time:.4f}s")
 
+        # === NAPRAWA: Gdy oba tory skończą - zaktualizuj GUI ale NIE zatrzymuj timer_running ===
         if len(self.left_lane_crossings) == 5 and len(self.right_lane_crossings) == 5:
-            self.timer_running = False
-            self.race_completed = False
-            self.next_race_btn.config(state='normal')
+            if not self.race_completed:
+                self.race_completed = True
+                self.next_race_btn.config(state='normal')
 
-            max_time = max(self.left_lane_crossings[-1], self.right_lane_crossings[-1])
-            self.timer_label.config(text=self.format_time_mmss(max_time))
+                max_time = max(self.left_lane_crossings[-1], self.right_lane_crossings[-1])
+                self.timer_label.config(text=self.format_time_mmss(max_time))
+                print(f"⏱️  OSF DRUŻYNA: Oba tory skończone - wyświetlam wyniki na LED")
+                print(f"   📺 TOR 1: {self.format_time_mmss(self.left_lane_result)}")
+                print(f"   📺 TOR 2: {self.format_time_mmss(self.right_lane_result)}")
 
-            # === NIEZALEŻNE ZEGARY - WYNIKI WYŚWIETLANE NATYCHMIAST W update_live_timer ===
-            # Każdy tor pokazuje wynik jak skończy (nie czekamy na oba tory)
+            # === NIEZALEŻNE ZEGARY - WYNIKI WYŚWIETLANE CIĄGLE W update_live_timer ===
+            # Każdy tor pokazuje wynik natychmiast jak skończy i KONTYNUUJE wysyłanie co 50ms
 
     def handle_wachadlo(self, channel, time_seconds):
         """WACHADŁO"""
@@ -2383,12 +2379,8 @@ class ChronometerManager:
                 timestamp
             ), tags=('race',))
 
-            # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 1 ===
-            if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                result_str = self.format_time_mmss(left_time)
-                packet1 = create_finish_packet_line1(result_str)
-                self.led_manager.display.send_packet(packet1, delay=0)
-                print(f"📺 LED: TOR 1 (WACHADŁO, kanał 4) zakończony - result_time={left_time:.4f}s, formatted={result_str}")
+            # === NAPRAWA: Nie wysyłaj pakietów tutaj - pozwól update_live_timer() to obsłużyć ===
+            print(f"✅ LED: TOR 1 (WACHADŁO, kanał 4) zakończony - result_time={left_time:.4f}s")
 
         if len(self.right_lane_crossings) == 13 and self.right_lane_result is None:
             right_time = self.right_lane_crossings[-1]
@@ -2414,23 +2406,23 @@ class ChronometerManager:
                 timestamp
             ), tags=('race',))
 
-            # === NATYCHMIASTOWE WYSŁANIE CZASU NA LED - LINIA 2 ===
-            if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                result_str = self.format_time_mmss(right_time)
-                packet2 = create_finish_packet_line2(result_str)
-                self.led_manager.display.send_packet(packet2, delay=0)
-                print(f"📺 LED: TOR 2 (WACHADŁO, kanał 3) zakończony - result_time={right_time:.4f}s, formatted={result_str}")
+            # === NAPRAWA: Nie wysyłaj pakietów tutaj - pozwól update_live_timer() to obsłużyć ===
+            print(f"✅ LED: TOR 2 (WACHADŁO, kanał 3) zakończony - result_time={right_time:.4f}s")
 
+        # === NAPRAWA: Gdy oba tory skończą - zaktualizuj GUI ale NIE zatrzymuj timer_running ===
         if len(self.left_lane_crossings) == 13 and len(self.right_lane_crossings) == 13:
-            self.timer_running = False
-            self.race_completed = False
-            self.next_race_btn.config(state='normal')
+            if not self.race_completed:
+                self.race_completed = True
+                self.next_race_btn.config(state='normal')
 
-            max_time = max(self.left_lane_crossings[-1], self.right_lane_crossings[-1])
-            self.timer_label.config(text=self.format_time_mmss(max_time))
+                max_time = max(self.left_lane_crossings[-1], self.right_lane_crossings[-1])
+                self.timer_label.config(text=self.format_time_mmss(max_time))
+                print(f"⏱️  WACHADŁO: Oba tory skończone - wyświetlam wyniki na LED")
+                print(f"   📺 TOR 1: {self.format_time_mmss(self.left_lane_result)}")
+                print(f"   📺 TOR 2: {self.format_time_mmss(self.right_lane_result)}")
 
-            # === NIEZALEŻNE ZEGARY - WYNIKI WYŚWIETLANE NATYCHMIAST W update_live_timer ===
-            # Każdy tor pokazuje wynik jak skończy (nie czekamy na oba tory)
+            # === NIEZALEŻNE ZEGARY - WYNIKI WYŚWIETLANE CIĄGLE W update_live_timer ===
+            # Każdy tor pokazuje wynik natychmiast jak skończy i KONTYNUUJE wysyłanie co 50ms
 
     def update_display(self, text):
         """Aktualizacja pola tekstowego"""
@@ -2560,8 +2552,13 @@ class ChronometerManager:
             elapsed = time.time() - self.start_absolute_time
             time_str_formatted = self.format_time_mmss(elapsed)
 
-            # Aktualizuj GUI - TEN SAM czas co LED!
-            self.timer_label.config(text=time_str_formatted, fg='#4CAF50')
+            # === NAPRAWA: Aktualizuj GUI tylko gdy bieg nie jest zakończony ===
+            if not self.race_completed:
+                # Bieg trwa - aktualizuj timer zielonym kolorem
+                self.timer_label.config(text=time_str_formatted, fg='#4CAF50')
+            else:
+                # Bieg zakończony - zostaw czas niebieski (już ustawiony w handle_osf_dwa_tory)
+                self.timer_label.config(fg='#2196F3')
 
             # DEBUG: Loguj różnicę czasu (usuń po testach)
             if hasattr(self, '_debug_last_log_time'):
@@ -2571,13 +2568,15 @@ class ChronometerManager:
             else:
                 self._debug_last_log_time = 0
 
-            # === WYŚWIETLANIE BIEGNĄCEGO CZASU NA LED (OSF) ===
+            # === WYŚWIETLANIE CZASU NA LED (OSF) - ZAWSZE, nawet gdy race_completed ===
+            # KLUCZOWA NAPRAWA: Kontynuuj wysyłanie pakietów LED co 50ms nawet po zakończeniu
+            # (analogicznie do LA gdzie pakiety są wysyłane ciągle przez cały czas)
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                 # TRYBY Z DWOMA TORAMI - każdy tor niezależnie
                 if self.current_mode in [MeasurementMode.OSF_DWA_TORY,
                                         MeasurementMode.OSF_DRUZYNA,
                                         MeasurementMode.WACHADLO]:
-                    # KLUCZOWA NAPRAWA: ZAWSZE wysyłaj pakiety co 50ms dla pełnej synchronizacji!
+                    # ZAWSZE wysyłaj pakiety co 50ms dla pełnej synchronizacji!
                     # Dla torów biegnących: wysyłaj ZWYKŁE PAKIETY CZASU (0x3A) Z NAZWAMI TORÓW
                     # Dla torów zakończonych: wysyłaj PAKIETY FINAŁOWE (0x3E) z nazwami torów
                     # To zapobiega nadpisywaniu wyników przez biegnący timer!
