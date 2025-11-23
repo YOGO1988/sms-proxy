@@ -2126,10 +2126,9 @@ class ChronometerManager:
                     # Rozwiązanie: Wyślij ostatni pakiet z czasem finalnym TUTAJ, ZANIM ustawisz flagę
                     if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                         result_str = self.format_time_mmss(result_time)
-                        # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
-                        for _ in range(3):
-                            packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
-                            self.led_manager.display.send_packet(packet1, delay=0.02)
+                        # Wyślij pakiet finałowy RAZ (update_live_timer kontynuuje wysyłanie co 50ms)
+                        packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
+                        self.led_manager.display.send_packet(packet1, delay=0)
                         print(f"📺 LED: TOR 1 (kanał 4) wysłano ostatni pakiet - time={result_time:.4f}s, formatted={result_str}")
 
                     # DOPIERO TERAZ ustaw flagę finished (update_live_timer będzie kontynuować wysyłanie tego czasu)
@@ -2174,10 +2173,9 @@ class ChronometerManager:
                     # Rozwiązanie: Wyślij ostatni pakiet z czasem finalnym TUTAJ, ZANIM ustawisz flagę
                     if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                         result_str = self.format_time_mmss(result_time)
-                        # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
-                        for _ in range(3):
-                            packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
-                            self.led_manager.display.send_packet(packet2, delay=0.02)
+                        # Wyślij pakiet finałowy RAZ (update_live_timer kontynuuje wysyłanie co 50ms)
+                        packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
+                        self.led_manager.display.send_packet(packet2, delay=0)
                         print(f"📺 LED: TOR 2 (kanał 3) wysłano ostatni pakiet - time={result_time:.4f}s, formatted={result_str}")
 
                     # DOPIERO TERAZ ustaw flagę finished (update_live_timer będzie kontynuować wysyłanie tego czasu)
@@ -2331,10 +2329,9 @@ class ChronometerManager:
             # === NAPRAWA RACE CONDITION: Wyślij ostatni pakiet PRZED ustawieniem flagi finished ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                 result_str = self.format_time_mmss(left_time)
-                # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
-                for _ in range(3):
-                    packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
-                    self.led_manager.display.send_packet(packet1, delay=0.02)
+                # Wyślij pakiet finałowy RAZ (update_live_timer kontynuuje wysyłanie co 50ms)
+                packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
+                self.led_manager.display.send_packet(packet1, delay=0)
                 print(f"📺 LED: TOR 1 (DRUŻYNA) wysłano ostatni pakiet - time={left_time:.4f}s, formatted={result_str}")
 
             # DOPIERO TERAZ ustaw flagę finished (update_live_timer będzie kontynuować wysyłanie tego czasu)
@@ -2368,10 +2365,9 @@ class ChronometerManager:
             # === NAPRAWA RACE CONDITION: Wyślij ostatni pakiet PRZED ustawieniem flagi finished ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                 result_str = self.format_time_mmss(right_time)
-                # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
-                for _ in range(3):
-                    packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
-                    self.led_manager.display.send_packet(packet2, delay=0.02)
+                # Wyślij pakiet finałowy RAZ (update_live_timer kontynuuje wysyłanie co 50ms)
+                packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
+                self.led_manager.display.send_packet(packet2, delay=0)
                 print(f"📺 LED: TOR 2 (DRUŻYNA) wysłano ostatni pakiet - time={right_time:.4f}s, formatted={result_str}")
 
             # DOPIERO TERAZ ustaw flagę finished (update_live_timer będzie kontynuować wysyłanie tego czasu)
@@ -2504,10 +2500,9 @@ class ChronometerManager:
             # === NAPRAWA RACE CONDITION: Wyślij ostatni pakiet PRZED ustawieniem flagi finished ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                 result_str = self.format_time_mmss(left_time)
-                # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
-                for _ in range(3):
-                    packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
-                    self.led_manager.display.send_packet(packet1, delay=0.02)
+                # Wyślij pakiet finałowy RAZ (update_live_timer kontynuuje wysyłanie co 50ms)
+                packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
+                self.led_manager.display.send_packet(packet1, delay=0)
                 print(f"📺 LED: TOR 1 (WACHADŁO) wysłano ostatni pakiet - time={left_time:.4f}s, formatted={result_str}")
 
             # DOPIERO TERAZ ustaw flagę finished (update_live_timer będzie kontynuować wysyłanie tego czasu)
@@ -2541,10 +2536,9 @@ class ChronometerManager:
             # === NAPRAWA RACE CONDITION: Wyślij ostatni pakiet PRZED ustawieniem flagi finished ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                 result_str = self.format_time_mmss(right_time)
-                # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
-                for _ in range(3):
-                    packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
-                    self.led_manager.display.send_packet(packet2, delay=0.02)
+                # Wyślij pakiet finałowy RAZ (update_live_timer kontynuuje wysyłanie co 50ms)
+                packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
+                self.led_manager.display.send_packet(packet2, delay=0)
                 print(f"📺 LED: TOR 2 (WACHADŁO) wysłano ostatni pakiet - time={right_time:.4f}s, formatted={result_str}")
 
             # DOPIERO TERAZ ustaw flagę finished (update_live_timer będzie kontynuować wysyłanie tego czasu)
@@ -2777,11 +2771,12 @@ class ChronometerManager:
                         packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
 
                     # WYŚLIJ PAKIETY NA OBU LINIACH Z OPÓŹNIENIEM
-                    # NAPRAWA: Zwiększono delay dla packet2, aby uniknąć kolizji
+                    # NAPRAWA: packet1 bez delay, packet2 z małym delay aby uniknąć kolizji
+                    # Łączny czas wysyłania: ~20ms << 50ms (update_live_timer interval)
                     if packet1:
-                        self.led_manager.display.send_packet(packet1, delay=0.03)
+                        self.led_manager.display.send_packet(packet1, delay=0)
                     if packet2:
-                        self.led_manager.display.send_packet(packet2, delay=0.03)
+                        self.led_manager.display.send_packet(packet2, delay=0.02)
                         # DEBUG: Zaloguj wysyłanie pakietu (tylko gdy left_lane_finished)
                         if self.left_lane_finished:
                             if hasattr(self, '_debug_packet2_sent_count'):
@@ -2986,10 +2981,9 @@ class ChronometerManager:
                     # === NAPRAWA RACE CONDITION: Wyślij ostatni pakiet PRZED ustawieniem flagi finished ===
                     if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                         result_str = self.format_time_mmss(result_time)
-                        # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
-                        for _ in range(3):
-                            packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
-                            self.led_manager.display.send_packet(packet1, delay=0.02)
+                        # Wyślij pakiet finałowy RAZ (update_live_timer kontynuuje wysyłanie co 50ms)
+                        packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
+                        self.led_manager.display.send_packet(packet1, delay=0)
                         print(f"📺 LED: TOR 1 (RĘCZ) wysłano ostatni pakiet - time={result_time:.4f}s, formatted={result_str}")
 
                     # DOPIERO TERAZ ustaw flagę finished
@@ -3025,10 +3019,9 @@ class ChronometerManager:
                     # === NAPRAWA RACE CONDITION: Wyślij ostatni pakiet PRZED ustawieniem flagi finished ===
                     if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                         result_str = self.format_time_mmss(result_time)
-                        # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
-                        for _ in range(3):
-                            packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
-                            self.led_manager.display.send_packet(packet2, delay=0.02)
+                        # Wyślij pakiet finałowy RAZ (update_live_timer kontynuuje wysyłanie co 50ms)
+                        packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
+                        self.led_manager.display.send_packet(packet2, delay=0)
                         print(f"📺 LED: TOR 2 (RĘCZ) wysłano ostatni pakiet - time={result_time:.4f}s, formatted={result_str}")
 
                     # DOPIERO TERAZ ustaw flagę finished
@@ -3067,10 +3060,9 @@ class ChronometerManager:
                 # === NAPRAWA RACE CONDITION: Wyślij ostatni pakiet PRZED ustawieniem flagi finished ===
                 if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                     result_str = self.format_time_mmss(result_time)
-                    # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
-                    for _ in range(3):
-                        packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
-                        self.led_manager.display.send_packet(packet2, delay=0.02)
+                    # Wyślij pakiet finałowy RAZ (update_live_timer kontynuuje wysyłanie co 50ms)
+                    packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
+                    self.led_manager.display.send_packet(packet2, delay=0)
                     print(f"📺 LED: TOR 2 (RĘCZ) wysłano ostatni pakiet - time={result_time:.4f}s, formatted={result_str}")
 
                 # DOPIERO TERAZ ustaw flagę finished
@@ -3109,10 +3101,9 @@ class ChronometerManager:
                 # === NAPRAWA RACE CONDITION: Wyślij ostatni pakiet PRZED ustawieniem flagi finished ===
                 if self.led_enabled and self.led_manager and self.led_manager.display.connected:
                     result_str = self.format_time_mmss(result_time)
-                    # Wyślij pakiet 3 razy dla pewności (race condition z update_live_timer)
-                    for _ in range(3):
-                        packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
-                        self.led_manager.display.send_packet(packet1, delay=0.02)
+                    # Wyślij pakiet finałowy RAZ (update_live_timer kontynuuje wysyłanie co 50ms)
+                    packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
+                    self.led_manager.display.send_packet(packet1, delay=0)
                     print(f"📺 LED: TOR 1 (RĘCZ) wysłano ostatni pakiet - time={result_time:.4f}s, formatted={result_str}")
 
                 # DOPIERO TERAZ ustaw flagę finished
