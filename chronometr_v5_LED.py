@@ -2655,6 +2655,12 @@ class ChronometerManager:
             delattr(self, '_debug_right_done')
         if hasattr(self, '_debug_last_log_time'):
             delattr(self, '_debug_last_log_time')
+        if hasattr(self, '_debug_last_packet2_log'):
+            delattr(self, '_debug_last_packet2_log')
+        if hasattr(self, '_debug_packet2_sent_count'):
+            delattr(self, '_debug_packet2_sent_count')
+        if hasattr(self, '_debug_no_packet2_logged'):
+            delattr(self, '_debug_no_packet2_logged')
 
         self.next_race_btn.config(state='disabled')
 
@@ -2758,18 +2764,39 @@ class ChronometerManager:
                     if not self.right_lane_finished:
                         # TOR 2 nadal biegnie - pokaż bieżący czas na linii 2 (ten sam co linia 1!)
                         packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
+                        # DEBUG: Zaloguj tworzenie pakietu dla toru 2 (co 2 sekundy)
+                        if hasattr(self, '_debug_last_packet2_log'):
+                            if elapsed - self._debug_last_packet2_log > 2.0:
+                                print(f"📦 DEBUG: Tworzę packet2 dla toru 2 (bieżący czas) - time={time_str_formatted}, L_finished={self.left_lane_finished}, R_finished={self.right_lane_finished}")
+                                self._debug_last_packet2_log = elapsed
+                        else:
+                            self._debug_last_packet2_log = 0
                     elif self.right_lane_result is not None:
                         # TOR 2 zakończony - pokaż czas finałowy na linii 2 (z nazwą toru)
                         result_str = self.format_time_mmss(self.right_lane_result)
                         packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
 
                     # WYŚLIJ PAKIETY NA OBU LINIACH Z OPÓŹNIENIEM
-                    # NAPRAWA: Dodano delay=0.03 dla packet1, aby tablica LED miała czas
-                    # przetworzyć pierwszy pakiet przed otrzymaniem drugiego
+                    # NAPRAWA: Zwiększono delay dla packet2, aby uniknąć kolizji
                     if packet1:
                         self.led_manager.display.send_packet(packet1, delay=0.03)
                     if packet2:
-                        self.led_manager.display.send_packet(packet2, delay=0)
+                        self.led_manager.display.send_packet(packet2, delay=0.03)
+                        # DEBUG: Zaloguj wysyłanie pakietu (tylko gdy left_lane_finished)
+                        if self.left_lane_finished:
+                            if hasattr(self, '_debug_packet2_sent_count'):
+                                self._debug_packet2_sent_count += 1
+                                if self._debug_packet2_sent_count % 20 == 1:  # Log co 20-ty pakiet
+                                    print(f"📡 DEBUG: Wysyłam packet2 (count={self._debug_packet2_sent_count}) - R_finished={self.right_lane_finished}, time={time_str_formatted}")
+                            else:
+                                self._debug_packet2_sent_count = 1
+                                print(f"📡 DEBUG: Pierwszy packet2 po zakończeniu toru 1 - R_finished={self.right_lane_finished}")
+                    else:
+                        # DEBUG: Zaloguj jeśli packet2 NIE jest wysyłany
+                        if self.left_lane_finished and not self.right_lane_finished:
+                            if not hasattr(self, '_debug_no_packet2_logged'):
+                                print(f"⚠️  DEBUG: packet2 jest None! L_finished={self.left_lane_finished}, R_finished={self.right_lane_finished}, R_result={self.right_lane_result}")
+                                self._debug_no_packet2_logged = True
 
                 else:
                     # TRYB POJEDYNCZY - jeden zegar z tą samą logiką co tryby dwóch torów
@@ -2875,9 +2902,17 @@ class ChronometerManager:
             messagebox.showwarning("Uwaga", "Kliknij KOLEJNY BIEG!")
             return
 
-        # === WYCZYŚĆ LED PRZY STARCIE ===
+        # === WYCZYŚĆ LED PRZY STARCIE I WYŚLIJ PAKIETY INICJALIZACYJNE ===
         if self.led_enabled and self.led_manager:
             self.led_manager.display.clear_display()
+            # Wyślij pakiety inicjalizacyjne dla trybu DWA TORY
+            mode_text = self.mode_var.get()
+            if "DWA TORY" in mode_text or "DRUŻYNA" in mode_text or "WAHADŁO" in mode_text:
+                init_packet1 = create_init_packet_line1("TOR 1    0)")
+                init_packet2 = create_init_packet_line2("TOR 2    0)")
+                self.led_manager.display.send_packet(init_packet1, delay=0.05)
+                self.led_manager.display.send_packet(init_packet2, delay=0.05)
+                print(f"📺 LED: Wysłano pakiety inicjalizacyjne dla obu torów (START RĘCZNY)")
 
         self.start_time = 0
         self.start_absolute_time = time.time()
