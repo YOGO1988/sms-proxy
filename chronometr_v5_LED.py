@@ -2763,9 +2763,11 @@ class ChronometerManager:
                         result_str = self.format_time_mmss(self.right_lane_result)
                         packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
 
-                    # WYŚLIJ PAKIETY NA OBU LINIACH JEDNOCZEŚNIE
+                    # WYŚLIJ PAKIETY NA OBU LINIACH Z OPÓŹNIENIEM
+                    # NAPRAWA: Dodano delay=0.03 dla packet1, aby tablica LED miała czas
+                    # przetworzyć pierwszy pakiet przed otrzymaniem drugiego
                     if packet1:
-                        self.led_manager.display.send_packet(packet1, delay=0)
+                        self.led_manager.display.send_packet(packet1, delay=0.03)
                     if packet2:
                         self.led_manager.display.send_packet(packet2, delay=0)
 
