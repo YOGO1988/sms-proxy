@@ -581,6 +581,10 @@ class ChronometerManager:
         self.led_port = 'COM6'
         self.led_brightness = 100
 
+        # FLAGA BLOKADY: Blokuje wysyłanie pakietów TIME zaraz po INIT
+        self.led_init_sent_time = None
+        self.led_init_block_duration = 0.5  # 500ms blokada po wysłaniu INIT
+
         # Zmienne chronometru
         self.serial_port = None
         self.serial_thread = None
@@ -2092,11 +2096,13 @@ class ChronometerManager:
             # Wyczyść LED i wyślij pakiety inicjalizacyjne dla obu torów
             if self.led_enabled and self.led_manager:
                 self.led_manager.display.clear_display()
+                time.sleep(0.1)  # Pauza po czyszczeniu
                 init_packet1 = create_init_packet_line1("TOR 1    0)")
                 init_packet2 = create_init_packet_line2("TOR 2    0)")
-                self.led_manager.display.send_packet(init_packet1, delay=0.05)
-                self.led_manager.display.send_packet(init_packet2, delay=0.05)
-                print(f"📺 LED: START - pakiety inicjalizacyjne dla obu torów")
+                self.led_manager.display.send_packet(init_packet1, delay=0.1)  # Zwiększone opóźnienie
+                self.led_manager.display.send_packet(init_packet2, delay=0.1)  # Zwiększone opóźnienie
+                self.led_init_sent_time = time.time()  # BLOKADA: Ustaw czas wysłania INIT
+                print(f"📺 LED: START - pakiety inicjalizacyjne dla obu torów (blokada przez {self.led_init_block_duration}s)")
 
             # Zresetuj wszystkie zmienne biegu
             self.start_time = time_seconds
@@ -2590,6 +2596,11 @@ class ChronometerManager:
         if hasattr(self, '_right_finish_sent'):
             delattr(self, '_right_finish_sent')
 
+        # RESET FLAGI BLOKADY LED INIT
+        self.led_init_sent_time = None
+        if hasattr(self, '_init_block_logged'):
+            delattr(self, '_init_block_logged')
+
         self.last_crossing_time = {1: 0, 3: 0, 4: 0}
 
         # DEBUG: reset debug flags
@@ -2641,6 +2652,11 @@ class ChronometerManager:
             if hasattr(self, '_right_finish_sent'):
                 delattr(self, '_right_finish_sent')
 
+            # RESET FLAGI BLOKADY LED INIT
+            self.led_init_sent_time = None
+            if hasattr(self, '_init_block_logged'):
+                delattr(self, '_init_block_logged')
+
             self.last_crossing_time = {1: 0, 3: 0, 4: 0}
 
             self.next_race_btn.config(state='normal')
@@ -2681,50 +2697,69 @@ class ChronometerManager:
 
             # === WYŚWIETLANIE CZASU NA LED (OSF) ===
             if self.led_enabled and self.led_manager and self.led_manager.display.connected:
-                if self.current_mode in [MeasurementMode.OSF_DWA_TORY, MeasurementMode.OSF_DRUZYNA, MeasurementMode.WACHADLO]:
-                    # === TRYBY Z DWOMA TORAMI - KAŻDA LINIA NIEZALEŻNA ===
-                    # LINIA 1 (TOR 1): Pokazuje bieżący czas lub czas finałowy toru 1
-                    # LINIA 2 (TOR 2): Pokazuje bieżący czas lub czas finałowy toru 2
-
-                    # LINIA 1 - TOR 1
-                    if not self.left_lane_finished:
-                        # Tor 1 biegnie - wyświetl bieżący czas
-                        packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
-                    elif self.left_lane_result is not None:
-                        # Tor 1 zakończony - wyświetl czas finałowy
-                        result_str = self.format_time_mmss(self.left_lane_result)
-                        packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
+                # SPRAWDŹ BLOKADĘ: Czy minęła blokada po INIT?
+                init_block_active = False
+                if self.led_init_sent_time is not None:
+                    time_since_init = time.time() - self.led_init_sent_time
+                    if time_since_init < self.led_init_block_duration:
+                        init_block_active = True
+                        # Loguj tylko raz na początku blokady
+                        if not hasattr(self, '_init_block_logged'):
+                            print(f"⏸️  LED: BLOKADA aktywna - pominięto wysyłanie TIME (czas od INIT: {time_since_init:.3f}s)")
+                            self._init_block_logged = True
                     else:
-                        packet1 = None
+                        # Blokada minęła
+                        if self.led_init_sent_time is not None:
+                            self.led_init_sent_time = None  # Wyczyść flagę
+                            if hasattr(self, '_init_block_logged'):
+                                delattr(self, '_init_block_logged')
+                            print(f"▶️  LED: BLOKADA zakończona - wznowiono wysyłanie TIME")
 
-                    # LINIA 2 - TOR 2
-                    if not self.right_lane_finished:
-                        # Tor 2 biegnie - wyświetl bieżący czas
-                        packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
-                    elif self.right_lane_result is not None:
-                        # Tor 2 zakończony - wyświetl czas finałowy
-                        result_str = self.format_time_mmss(self.right_lane_result)
-                        packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
+                if not init_block_active:
+                    if self.current_mode in [MeasurementMode.OSF_DWA_TORY, MeasurementMode.OSF_DRUZYNA, MeasurementMode.WACHADLO]:
+                        # === TRYBY Z DWOMA TORAMI - KAŻDA LINIA NIEZALEŻNA ===
+                        # LINIA 1 (TOR 1): Pokazuje bieżący czas lub czas finałowy toru 1
+                        # LINIA 2 (TOR 2): Pokazuje bieżący czas lub czas finałowy toru 2
+
+                        # LINIA 1 - TOR 1
+                        if not self.left_lane_finished:
+                            # Tor 1 biegnie - wyświetl bieżący czas
+                            packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
+                        elif self.left_lane_result is not None:
+                            # Tor 1 zakończony - wyświetl czas finałowy
+                            result_str = self.format_time_mmss(self.left_lane_result)
+                            packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
+                        else:
+                            packet1 = None
+
+                        # LINIA 2 - TOR 2
+                        if not self.right_lane_finished:
+                            # Tor 2 biegnie - wyświetl bieżący czas
+                            packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
+                        elif self.right_lane_result is not None:
+                            # Tor 2 zakończony - wyświetl czas finałowy
+                            result_str = self.format_time_mmss(self.right_lane_result)
+                            packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
+                        else:
+                            packet2 = None
+
+                        # Wyślij pakiety na obie linie (ze zwiększonymi opóźnieniami)
+                        if packet1:
+                            self.led_manager.display.send_packet(packet1, delay=0)
+                        if packet2:
+                            self.led_manager.display.send_packet(packet2, delay=0.05)  # Zwiększone opóźnienie z 0.02 do 0.05
+
                     else:
-                        packet2 = None
-
-                    # Wyślij pakiety na obie linie (z małym opóźnieniem między nimi)
-                    if packet1:
-                        self.led_manager.display.send_packet(packet1, delay=0)
-                    if packet2:
-                        self.led_manager.display.send_packet(packet2, delay=0.02)
-
-                else:
-                    # TRYB POJEDYNCZY - jedna linia
-                    if not self.left_lane_finished:
-                        # Bieg trwa - wyświetl bieżący czas
-                        packet = create_time_packet_line1(time_str_formatted, add_dash=False)
-                        self.led_manager.display.send_packet(packet, delay=0)
-                    elif self.left_lane_result is not None:
-                        # Bieg zakończony - wyświetl czas finałowy
-                        result_str = self.format_time_mmss(self.left_lane_result)
-                        packet = create_time_packet_line1(result_str, add_dash=False)
-                        self.led_manager.display.send_packet(packet, delay=0)
+                        # TRYB POJEDYNCZY - jedna linia
+                        if not self.left_lane_finished:
+                            # Bieg trwa - wyświetl bieżący czas
+                            packet = create_time_packet_line1(time_str_formatted, add_dash=False)
+                            self.led_manager.display.send_packet(packet, delay=0)
+                        elif self.left_lane_result is not None:
+                            # Bieg zakończony - wyświetl czas finałowy
+                            result_str = self.format_time_mmss(self.left_lane_result)
+                            packet = create_time_packet_line1(result_str, add_dash=False)
+                            self.led_manager.display.send_packet(packet, delay=0)
 
         elif self.race_completed:
             self.timer_label.config(fg='#2196F3')
@@ -2821,14 +2856,16 @@ class ChronometerManager:
         # === WYCZYŚĆ LED PRZY STARCIE I WYŚLIJ PAKIETY INICJALIZACYJNE ===
         if self.led_enabled and self.led_manager:
             self.led_manager.display.clear_display()
+            time.sleep(0.1)  # Pauza po czyszczeniu
             # Wyślij pakiety inicjalizacyjne dla trybu DWA TORY
             mode_text = self.mode_var.get()
             if "DWA TORY" in mode_text or "DRUŻYNA" in mode_text or "WAHADŁO" in mode_text:
                 init_packet1 = create_init_packet_line1("TOR 1    0)")
                 init_packet2 = create_init_packet_line2("TOR 2    0)")
-                self.led_manager.display.send_packet(init_packet1, delay=0.05)
-                self.led_manager.display.send_packet(init_packet2, delay=0.05)
-                print(f"📺 LED: Wysłano pakiety inicjalizacyjne dla obu torów (START RĘCZNY)")
+                self.led_manager.display.send_packet(init_packet1, delay=0.1)  # Zwiększone opóźnienie
+                self.led_manager.display.send_packet(init_packet2, delay=0.1)  # Zwiększone opóźnienie
+                self.led_init_sent_time = time.time()  # BLOKADA: Ustaw czas wysłania INIT
+                print(f"📺 LED: Wysłano pakiety inicjalizacyjne dla obu torów (START RĘCZNY, blokada przez {self.led_init_block_duration}s)")
 
         self.start_time = 0
         self.start_absolute_time = time.time()
