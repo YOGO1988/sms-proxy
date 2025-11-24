@@ -45,12 +45,14 @@ def calculate_crc16(data: bytes) -> int:
     return crc
 
 
-def create_time_packet_line1(time_str: str) -> bytes:
+def create_time_packet_line1(time_str: str, add_dash: bool = False, lane_name: str = None) -> bytes:
     """
     Pakiet czasu dla linii 1
 
     Args:
         time_str: Czas w formacie "MM:SS.mmm"
+        add_dash: Czy dodać myślnik na końcu (domyślnie False)
+        lane_name: Nazwa toru do wyświetlenia (np. "TOR 1", opcjonalnie)
 
     Returns:
         Pakiet bajtów do wysłania na tablicę
@@ -68,7 +70,15 @@ def create_time_packet_line1(time_str: str) -> bytes:
     else:
         formatted = time_str
 
-    text_padded = (formatted + "  - ").ljust(34)[:34]
+    # Dodaj nazwę toru jeśli podana, w przeciwnym razie myślnik lub spacje
+    if lane_name:
+        suffix = f"  {lane_name}"
+    elif add_dash:
+        suffix = "  - "
+    else:
+        suffix = "  "
+
+    text_padded = (formatted + suffix).ljust(34)[:34]
     base[22:56] = text_padded.encode('ascii', errors='replace')
 
     base[4] = 0
@@ -80,12 +90,14 @@ def create_time_packet_line1(time_str: str) -> bytes:
     return bytes(base)
 
 
-def create_time_packet_line2(time_str: str) -> bytes:
+def create_time_packet_line2(time_str: str, add_dash: bool = False, lane_name: str = None) -> bytes:
     """
     Pakiet czasu dla linii 2
 
     Args:
         time_str: Czas w formacie "MM:SS.mmm"
+        add_dash: Czy dodać myślnik na końcu (domyślnie False)
+        lane_name: Nazwa toru do wyświetlenia (np. "TOR 2", opcjonalnie)
 
     Returns:
         Pakiet bajtów do wysłania na tablicę
@@ -103,9 +115,95 @@ def create_time_packet_line2(time_str: str) -> bytes:
     else:
         formatted = time_str
 
-    text_padded = (formatted + "  - ").ljust(34)[:34]
+    # Dodaj nazwę toru jeśli podana, w przeciwnym razie myślnik lub spacje
+    if lane_name:
+        suffix = f"  {lane_name}"
+    elif add_dash:
+        suffix = "  - "
+    else:
+        suffix = "  "
+
+    text_padded = (formatted + suffix).ljust(34)[:34]
     base[22:56] = text_padded.encode('ascii', errors='replace')
 
+    base[4] = 0
+    base[5] = 0
+    crc = calculate_crc16(bytes(base))
+    base[4] = crc & 0xFF
+    base[5] = (crc >> 8) & 0xFF
+
+    return bytes(base)
+
+
+def create_finish_packet_line1(time_str: str) -> bytes:
+    """
+    Pakiet finałowy dla toru 1 (linia 1) z nazwą toru
+
+    Args:
+        time_str: Czas w formacie "MM:SS.mmm"
+
+    Returns:
+        Pakiet bajtów z tekstem "00'XX".XXX TOR 1"
+    """
+    # Używamy komendy 0x3E dla pakietów finałowych
+    base = bytearray.fromhex('1B 07 3E 00 A1 2A 00 00 01 00 00 00 00 00 00 00 00 00 00 00 0A 00 30 30 27 30 37 22 2E 37 38 37 20 54 4F 52 20 31 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+
+    # Format czasu: MM:SS.mmm -> MM'SS".mmm
+    parts = time_str.split(':')
+    if len(parts) == 2:
+        minutes = parts[0]
+        sec_parts = parts[1].split('.')
+        if len(sec_parts) == 2:
+            formatted = f"{minutes}'{sec_parts[0]}\".{sec_parts[1]}"
+        else:
+            formatted = f"{minutes}'{parts[1]}\""
+    else:
+        formatted = time_str
+
+    # Dodaj nazwę toru
+    display_text = f"{formatted} TOR 1 ".ljust(38)[:38]
+    base[22:60] = display_text.encode('ascii', errors='replace')
+
+    # Przelicz CRC
+    base[4] = 0
+    base[5] = 0
+    crc = calculate_crc16(bytes(base))
+    base[4] = crc & 0xFF
+    base[5] = (crc >> 8) & 0xFF
+
+    return bytes(base)
+
+
+def create_finish_packet_line2(time_str: str) -> bytes:
+    """
+    Pakiet finałowy dla toru 2 (linia 2) z nazwą toru
+
+    Args:
+        time_str: Czas w formacie "MM:SS.mmm"
+
+    Returns:
+        Pakiet bajtów z tekstem "00'XX".XXX TOR 2"
+    """
+    # Używamy komendy 0x3E dla pakietów finałowych
+    base = bytearray.fromhex('1B 07 3E 00 8F 5C 00 00 01 00 00 00 00 00 00 00 00 00 10 00 0A 00 30 30 27 31 30 22 2E 33 36 32 20 54 4F 52 20 32 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 0A'.replace(' ', ''))
+
+    # Format czasu: MM:SS.mmm -> MM'SS".mmm
+    parts = time_str.split(':')
+    if len(parts) == 2:
+        minutes = parts[0]
+        sec_parts = parts[1].split('.')
+        if len(sec_parts) == 2:
+            formatted = f"{minutes}'{sec_parts[0]}\".{sec_parts[1]}"
+        else:
+            formatted = f"{minutes}'{parts[1]}\""
+    else:
+        formatted = time_str
+
+    # Dodaj nazwę toru
+    display_text = f"{formatted} TOR 2 ".ljust(38)[:38]
+    base[22:60] = display_text.encode('ascii', errors='replace')
+
+    # Przelicz CRC
     base[4] = 0
     base[5] = 0
     crc = calculate_crc16(bytes(base))
@@ -501,6 +599,12 @@ class ChronometerManager:
         self.la_results = []  # Lista czasów w sekundach
         self.la_start_absolute_time = None
 
+        # Zmienne dla dwóch torów
+        self.lane1_finished = False
+        self.lane2_finished = False
+        self.lane1_time = None
+        self.lane2_time = None
+
         # GUI
         self.setup_la_tab()
 
@@ -686,12 +790,34 @@ class ChronometerManager:
                 packet = create_time_packet_line1(time_str)
                 self.led_manager.display.send_packet(packet, delay=0)
             else:
-                # Dwie linie - ten sam czas na obu
-                packet1 = create_time_packet_line1(time_str)
-                packet2 = create_time_packet_line2(time_str)
-                self.led_manager.display.send_packet(packet1, delay=0)
+                # Dwie linie - logika zgodna z OSF DWA TORY
+                # LINIA 1 - TOR 1
+                if not self.lane1_finished:
+                    # Tor 1 biegnie - wyświetl bieżący czas
+                    packet1 = create_time_packet_line1(time_str, add_dash=False)
+                    self.led_manager.display.send_packet(packet1, delay=0)
+                elif self.lane1_time is not None:
+                    # Tor 1 zakończony - wyświetl czas finałowy z "TOR 1"
+                    lane1_minutes = int(self.lane1_time // 60)
+                    lane1_seconds = self.lane1_time % 60
+                    lane1_time_str = f"{lane1_minutes:02d}:{lane1_seconds:06.3f}"
+                    packet1 = create_finish_packet_line1(lane1_time_str)
+                    self.led_manager.display.send_packet(packet1, delay=0)
+
                 time.sleep(0.05)
-                self.led_manager.display.send_packet(packet2, delay=0)
+
+                # LINIA 2 - TOR 2
+                if not self.lane2_finished:
+                    # Tor 2 biegnie - wyświetl bieżący czas
+                    packet2 = create_time_packet_line2(time_str, add_dash=False)
+                    self.led_manager.display.send_packet(packet2, delay=0)
+                elif self.lane2_time is not None:
+                    # Tor 2 zakończony - wyświetl czas finałowy z "TOR 2"
+                    lane2_minutes = int(self.lane2_time // 60)
+                    lane2_seconds = self.lane2_time % 60
+                    lane2_time_str = f"{lane2_minutes:02d}:{lane2_seconds:06.3f}"
+                    packet2 = create_finish_packet_line2(lane2_time_str)
+                    self.led_manager.display.send_packet(packet2, delay=0)
 
             time.sleep(0.1)  # Aktualizacja co 100ms
 
@@ -781,6 +907,12 @@ class ChronometerManager:
         # LED: Wyczyść tablicę
         self.led_clear()
 
+        # Reset flag torów
+        self.lane1_finished = False
+        self.lane2_finished = False
+        self.lane1_time = None
+        self.lane2_time = None
+
         self.la_race_number += 1
         print(f"➡️ Następny bieg: #{self.la_race_number}")
 
@@ -792,6 +924,12 @@ class ChronometerManager:
 
         # LED: Wyczyść tablicę
         self.led_clear()
+
+        # Reset flag torów
+        self.lane1_finished = False
+        self.lane2_finished = False
+        self.lane1_time = None
+        self.lane2_time = None
 
         # Start biegu
         self.la_race_active = True
@@ -826,6 +964,24 @@ class ChronometerManager:
         self.results_listbox.see(tk.END)
 
         print(f"🏁 META #{miejsce}: {time_str}")
+
+        # Logika wyświetlania dla dwóch torów
+        num_lanes = self.led_lanes_var.get()
+        if num_lanes == 2:
+            if miejsce == 1:
+                # Pierwszy META - tor 1 zakończony
+                self.lane1_finished = True
+                self.lane1_time = finish_time
+                print(f"📺 [LED] TOR 1 META - czas: {time_str}")
+            elif miejsce == 2:
+                # Drugi META - tor 2 zakończony
+                self.lane2_finished = True
+                self.lane2_time = finish_time
+                print(f"📺 [LED] TOR 2 META - czas: {time_str}")
+                # Zatrzymaj timer gdy oba tory zakończone
+                if self.lane1_finished and self.lane2_finished:
+                    self.led_stop_timer()
+                    print(f"🏁 [LED] OBA TORY ZAKOŃCZONE")
 
     def process_la_crossing(self, channel):
         """
@@ -877,6 +1033,12 @@ class ChronometerManager:
         self.la_start_absolute_time = None
         self.la_results.clear()
         self.la_race_number += 1
+
+        # Reset flag torów
+        self.lane1_finished = False
+        self.lane2_finished = False
+        self.lane1_time = None
+        self.lane2_time = None
 
         # Reset GUI
         self.timer_label.config(text="00:00.000", fg='#3498db')
