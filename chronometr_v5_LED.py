@@ -124,7 +124,7 @@ def create_time_packet_line1(time_str: str, add_dash: bool = False, lane_name: s
 
     # Dodaj nazwę toru jeśli podana, w przeciwnym razie myślnik lub spacje
     if lane_name:
-        suffix = f" {lane_name} "
+        suffix = f"  {lane_name}"  # DWA spacje przed, brak spacji po (jak w działającym teście)
     elif add_dash:
         suffix = "  - "
     else:
@@ -167,7 +167,7 @@ def create_time_packet_line2(time_str: str, add_dash: bool = False, lane_name: s
 
     # Dodaj nazwę toru jeśli podana, w przeciwnym razie myślnik lub spacje
     if lane_name:
-        suffix = f" {lane_name} "
+        suffix = f"  {lane_name}"  # DWA spacje przed, brak spacji po (jak w działającym teście)
     elif add_dash:
         suffix = "  - "
     else:
