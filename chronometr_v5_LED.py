@@ -620,6 +620,11 @@ class ChronometerManager:
         self.left_lane_finished = False
         self.right_lane_finished = False
 
+        # Flagi pakietów finałowych LED (dla OSF DWA TORY)
+        self.left_lane_finish_packet_sent = False
+        self.right_lane_finish_packet_sent = False
+        self.final_init_packets_sent = False
+
         # Live timer
         self.timer_running = False
 
@@ -2115,6 +2120,9 @@ class ChronometerManager:
             self.right_lane_result = None
             self.left_lane_finished = False
             self.right_lane_finished = False
+            self.left_lane_finish_packet_sent = False
+            self.right_lane_finish_packet_sent = False
+            self.final_init_packets_sent = False
             self.left_lane_crossings = []
             self.right_lane_crossings = []
             self.osf_all_left_crossings = []
@@ -2255,6 +2263,9 @@ class ChronometerManager:
             self.right_lane_result = None
             self.left_lane_finished = False
             self.right_lane_finished = False
+            self.left_lane_finish_packet_sent = False
+            self.right_lane_finish_packet_sent = False
+            self.final_init_packets_sent = False
             self.race_number += 1
             self.count_label.config(text=str(self.race_number))
             self.osf_manage_btn.config(state='normal')
@@ -2395,6 +2406,9 @@ class ChronometerManager:
             self.right_lane_result = None
             self.left_lane_finished = False
             self.right_lane_finished = False
+            self.left_lane_finish_packet_sent = False
+            self.right_lane_finish_packet_sent = False
+            self.final_init_packets_sent = False
             self.race_number += 1
             self.count_label.config(text=str(self.race_number))
             self.osf_manage_btn.config(state='normal')
@@ -2589,12 +2603,9 @@ class ChronometerManager:
         self.right_lane_result = None
         self.left_lane_finished = False
         self.right_lane_finished = False
-
-        # Wyczyść flagi finishowe LED
-        if hasattr(self, '_left_finish_sent'):
-            delattr(self, '_left_finish_sent')
-        if hasattr(self, '_right_finish_sent'):
-            delattr(self, '_right_finish_sent')
+        self.left_lane_finish_packet_sent = False
+        self.right_lane_finish_packet_sent = False
+        self.final_init_packets_sent = False
 
         # RESET FLAGI BLOKADY LED INIT
         self.led_init_sent_time = None
@@ -2718,36 +2729,68 @@ class ChronometerManager:
                 if not init_block_active:
                     if self.current_mode in [MeasurementMode.OSF_DWA_TORY, MeasurementMode.OSF_DRUZYNA, MeasurementMode.WACHADLO]:
                         # === TRYBY Z DWOMA TORAMI - KAŻDA LINIA NIEZALEŻNA ===
-                        # LINIA 1 (TOR 1): Pokazuje bieżący czas lub czas finałowy toru 1
-                        # LINIA 2 (TOR 2): Pokazuje bieżący czas lub czas finałowy toru 2
+                        # LOGIKA ZGODNA Z ORYGINALNYM PROGRAMEM:
+                        # - Podczas biegu: pakiety 0x3A z czasem + " - "
+                        # - Gdy tor kończy: JEDEN pakiet 0x3E z czasem + "TOR X"
+                        # - Potem: BRAK pakietów dla tego toru
 
                         # LINIA 1 - TOR 1
                         if not self.left_lane_finished:
-                            # Tor 1 biegnie - wyświetl bieżący czas
-                            packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
-                        elif self.left_lane_result is not None:
-                            # Tor 1 zakończony - wyświetl czas finałowy
+                            # Tor 1 biegnie - wyświetl bieżący czas (pakiet 0x3A)
+                            packet1 = create_time_packet_line1(time_str_formatted, add_dash=True)
+                        elif self.left_lane_result is not None and not self.left_lane_finish_packet_sent:
+                            # Tor 1 zakończony - wyślij JEDEN pakiet finałowy (0x3E)
                             result_str = self.format_time_mmss(self.left_lane_result)
-                            packet1 = create_time_packet_line1(result_str, lane_name="TOR 1")
+                            packet1 = create_finish_packet_line1(result_str)
+                            self.left_lane_finish_packet_sent = True
+                            print(f"📺 LED: TOR 1 META - wysłano pakiet finałowy (0x3E)")
                         else:
-                            packet1 = None
+                            packet1 = None  # Pakiet już wysłany, nie wysyłaj więcej
 
                         # LINIA 2 - TOR 2
                         if not self.right_lane_finished:
-                            # Tor 2 biegnie - wyświetl bieżący czas
-                            packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
-                        elif self.right_lane_result is not None:
-                            # Tor 2 zakończony - wyświetl czas finałowy
+                            # Tor 2 biegnie - wyświetl bieżący czas (pakiet 0x3A)
+                            packet2 = create_time_packet_line2(time_str_formatted, add_dash=True)
+                        elif self.right_lane_result is not None and not self.right_lane_finish_packet_sent:
+                            # Tor 2 zakończony - wyślij JEDEN pakiet finałowy (0x3E)
                             result_str = self.format_time_mmss(self.right_lane_result)
-                            packet2 = create_time_packet_line2(result_str, lane_name="TOR 2")
+                            packet2 = create_finish_packet_line2(result_str)
+                            self.right_lane_finish_packet_sent = True
+                            print(f"📺 LED: TOR 2 META - wysłano pakiet finałowy (0x3E)")
                         else:
-                            packet2 = None
+                            packet2 = None  # Pakiet już wysłany, nie wysyłaj więcej
 
-                        # Wyślij pakiety na obie linie (ze zwiększonymi opóźnieniami)
+                        # Wyślij pakiety na obie linie
                         if packet1:
                             self.led_manager.display.send_packet(packet1, delay=0)
                         if packet2:
-                            self.led_manager.display.send_packet(packet2, delay=0.05)  # Zwiększone opóźnienie z 0.02 do 0.05
+                            self.led_manager.display.send_packet(packet2, delay=0.05)
+
+                        # === PAKIETY KOŃCOWE INIT (gdy oba tory zakończone) ===
+                        if (self.left_lane_finished and self.right_lane_finished and
+                            self.left_lane_finish_packet_sent and self.right_lane_finish_packet_sent and
+                            not self.final_init_packets_sent):
+                            # Wyślij sekwencję pakietów końcowych zgodnie z oryginalnym programem:
+                            # 1. Init z nazwą "TOR 1    0)"
+                            # 2. Init z nazwą "TOR 2    0)"
+                            # 3. 2x init pusty dla linii 1
+                            # 4. 2x init pusty dla linii 2
+                            print(f"📺 LED: OBA TORY ZAKOŃCZONE - wysyłam pakiety końcowe init")
+
+                            init_tor1 = create_init_packet_line1("TOR 1    0)")
+                            init_tor2 = create_init_packet_line2("TOR 2    0)")
+                            init_empty1 = create_init_packet_line1("")
+                            init_empty2 = create_init_packet_line2("")
+
+                            self.led_manager.display.send_packet(init_tor1, delay=0.1)
+                            self.led_manager.display.send_packet(init_tor2, delay=0.1)
+                            self.led_manager.display.send_packet(init_empty1, delay=0.1)
+                            self.led_manager.display.send_packet(init_empty1, delay=0.1)  # 2x pusty linia 1
+                            self.led_manager.display.send_packet(init_empty2, delay=0.1)
+                            self.led_manager.display.send_packet(init_empty2, delay=0.1)  # 2x pusty linia 2
+
+                            self.final_init_packets_sent = True
+                            print(f"✅ LED: Pakiety końcowe init wysłane")
 
                     else:
                         # TRYB POJEDYNCZY - jedna linia
@@ -2878,14 +2921,11 @@ class ChronometerManager:
         self.right_lane_result = None
         self.left_lane_finished = False
         self.right_lane_finished = False
+        self.left_lane_finish_packet_sent = False
+        self.right_lane_finish_packet_sent = False
+        self.final_init_packets_sent = False
         self.left_lane_crossings = []
         self.right_lane_crossings = []
-
-        # Wyczyść flagi finishowe LED
-        if hasattr(self, '_left_finish_sent'):
-            delattr(self, '_left_finish_sent')
-        if hasattr(self, '_right_finish_sent'):
-            delattr(self, '_right_finish_sent')
 
         self.osf_all_left_crossings = []
         self.osf_all_right_crossings = []
