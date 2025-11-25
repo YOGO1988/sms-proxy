@@ -2734,7 +2734,15 @@ class ChronometerManager:
                         # - Gdy tor kończy: JEDEN pakiet 0x3E z czasem + "TOR X"
                         # - Potem: BRAK pakietów dla tego toru
 
+                        # DEBUG: Loguj stan raz na sekundę
+                        if not hasattr(self, '_debug_led_last_log'):
+                            self._debug_led_last_log = 0
+                        if elapsed - self._debug_led_last_log > 1.0:
+                            print(f"🔍 LED DEBUG: L_fin={self.left_lane_finished}, R_fin={self.right_lane_finished}, L_res={self.left_lane_result}, R_res={self.right_lane_result}")
+                            self._debug_led_last_log = elapsed
+
                         # LINIA 1 - TOR 1
+                        packet1 = None
                         if not self.left_lane_finished:
                             # Tor 1 biegnie - wyświetl bieżący czas BEZ myślnika (pakiet 0x3A)
                             packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
@@ -2748,6 +2756,7 @@ class ChronometerManager:
                             packet1 = None  # Pakiet już wysłany, nie wysyłaj więcej
 
                         # LINIA 2 - TOR 2
+                        packet2 = None
                         if not self.right_lane_finished:
                             # Tor 2 biegnie - wyświetl bieżący czas BEZ myślnika (pakiet 0x3A)
                             packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
@@ -2763,8 +2772,15 @@ class ChronometerManager:
                         # Wyślij pakiety na obie linie
                         if packet1:
                             self.led_manager.display.send_packet(packet1, delay=0)
+                            if not hasattr(self, '_debug_packet1_sent_count'):
+                                self._debug_packet1_sent_count = 0
+                            self._debug_packet1_sent_count += 1
                         if packet2:
                             self.led_manager.display.send_packet(packet2, delay=0.05)
+                            if not hasattr(self, '_debug_packet2_sent_count'):
+                                self._debug_packet2_sent_count = 0
+                                print(f"📤 LED: Pierwszy pakiet dla LINII 2 wysłany! (czas={time_str_formatted})")
+                            self._debug_packet2_sent_count += 1
 
                         # === PAKIETY KOŃCOWE INIT (gdy oba tory zakończone) ===
                         if (self.left_lane_finished and self.right_lane_finished and
