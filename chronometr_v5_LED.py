@@ -585,6 +585,13 @@ class ChronometerManager:
         self.led_init_sent_time = None
         self.led_init_block_duration = 0.5  # 500ms blokada po wysłaniu INIT
 
+        # OFFSET SYGNAŁU START: Opóźnienie między sygnałem start a uruchomieniem chronometru
+        # Wartość domyślna 0.18s bazuje na analizie systemów sportowych timing:
+        # - Ludzki czas reakcji (manual timing): ~150ms
+        # - Opóźnienie procesowania w systemie: ~30ms
+        # - Łącznie: ~180ms (0.18s)
+        self.start_signal_offset = 0.18  # Domyślnie 180ms
+
         # Zmienne chronometru
         self.serial_port = None
         self.serial_thread = None
@@ -715,6 +722,15 @@ class ChronometerManager:
                                              length=80, width=10, bg='#e8e8e8')
         self.led_brightness_scale.pack(side=tk.LEFT, padx=3)
 
+        # === OFFSET SYGNAŁU START ===
+        tk.Label(top_frame, text="Offset startu (ms):", font=('Arial', 8), bg='#e8e8e8').pack(side=tk.LEFT, padx=(10, 3))
+
+        self.start_offset_var = tk.IntVar(value=180)  # Domyślnie 180ms
+        self.start_offset_scale = tk.Scale(top_frame, from_=0, to=500, orient=tk.HORIZONTAL,
+                                           variable=self.start_offset_var, command=self.on_start_offset_change,
+                                           length=100, width=10, bg='#e8e8e8', resolution=10)
+        self.start_offset_scale.pack(side=tk.LEFT, padx=3)
+
         # === POLE TEKSTOWE STATYCZNE ===
         tk.Label(top_frame, text="Linia 1:", font=('Arial', 8), bg='#e8e8e8').pack(side=tk.LEFT, padx=(10, 3))
 
@@ -803,6 +819,11 @@ class ChronometerManager:
         self.led_brightness = int(value)
         if self.led_enabled and self.led_manager:
             self.led_manager.display.set_brightness(self.led_brightness)
+
+    def on_start_offset_change(self, value):
+        """Callback zmiany offsetu sygnału start"""
+        self.start_signal_offset = int(value) / 1000.0  # Konwersja z ms na sekundy
+        print(f"⏱️  Offset sygnału start: {self.start_signal_offset:.3f}s ({int(value)}ms)")
 
     def send_custom_text(self):
         """Wysyła własny tekst na tablicę LED"""
@@ -1402,9 +1423,11 @@ class ChronometerManager:
         if self.la_start_absolute_time is None:
             messagebox.showerror("Błąd", "Brak czasu startu!")
             return
-        
-        result_time = time.time() - self.la_start_absolute_time
-        
+
+        result_time_raw = time.time() - self.la_start_absolute_time
+        # Zastosuj offset sygnału start
+        result_time = max(0, result_time_raw - self.start_signal_offset)
+
         if len(self.la_results) < self.la_num_athletes:
             self.la_results.append(result_time)
             self.la_update_results_display()
@@ -1966,7 +1989,9 @@ class ChronometerManager:
             if self.la_start_absolute_time is None:
                 return
 
-            net_time = time.time() - self.la_start_absolute_time
+            net_time_raw = time.time() - self.la_start_absolute_time
+            # Zastosuj offset sygnału start
+            net_time = max(0, net_time_raw - self.start_signal_offset)
 
             self.la_pending_results.append(net_time)
             print(f">>> [LA] Odczyt #{len(self.la_pending_results)}: {net_time:.3f}s {'🔒' if is_blocked else '✓'}")
@@ -2043,7 +2068,9 @@ class ChronometerManager:
 
         elif channel == 4 and self.race_in_progress:
             if self.start_time is not None:
-                result_time = time.time() - self.start_absolute_time
+                result_time_raw = time.time() - self.start_absolute_time
+                # Zastosuj offset sygnału start
+                result_time = max(0, result_time_raw - self.start_signal_offset)
 
                 is_blocked = self.osf_block_var.get()
                 self.osf_all_left_crossings.append((result_time, is_blocked))
@@ -2136,7 +2163,9 @@ class ChronometerManager:
         elif channel == 4 and self.race_in_progress:
             # === META TOR 1 (kanał 4) → LINIA 1 ===
             if self.start_time is not None:
-                result_time = time.time() - self.start_absolute_time
+                result_time_raw = time.time() - self.start_absolute_time
+                # Zastosuj offset sygnału start
+                result_time = max(0, result_time_raw - self.start_signal_offset)
                 is_blocked = self.osf_block_var.get()
                 self.osf_all_left_crossings.append((result_time, is_blocked))
 
@@ -2182,7 +2211,9 @@ class ChronometerManager:
         elif channel == 3 and self.race_in_progress:
             # === META TOR 2 (kanał 3) → LINIA 2 ===
             if self.start_time is not None:
-                result_time = time.time() - self.start_absolute_time
+                result_time_raw = time.time() - self.start_absolute_time
+                # Zastosuj offset sygnału start
+                result_time = max(0, result_time_raw - self.start_signal_offset)
                 is_blocked = self.osf_block_var.get()
                 self.osf_all_right_crossings.append((result_time, is_blocked))
 
@@ -2298,7 +2329,9 @@ class ChronometerManager:
         elif channel == 4 and self.race_in_progress:
             # KANAŁ 4 = TOR 1 = LINIA 1
             if self.start_time is not None:
-                crossing_time = time.time() - self.start_absolute_time
+                crossing_time_raw = time.time() - self.start_absolute_time
+                # Zastosuj offset sygnału start
+                crossing_time = max(0, crossing_time_raw - self.start_signal_offset)
 
                 is_blocked = self.osf_block_var.get()
                 self.osf_all_left_crossings.append((crossing_time, is_blocked))
@@ -2310,7 +2343,9 @@ class ChronometerManager:
         elif channel == 3 and self.race_in_progress:
             # KANAŁ 3 = TOR 2 = LINIA 2
             if self.start_time is not None:
-                crossing_time = time.time() - self.start_absolute_time
+                crossing_time_raw = time.time() - self.start_absolute_time
+                # Zastosuj offset sygnału start
+                crossing_time = max(0, crossing_time_raw - self.start_signal_offset)
 
                 is_blocked = self.osf_block_var.get()
                 self.osf_all_right_crossings.append((crossing_time, is_blocked))
@@ -2472,7 +2507,9 @@ class ChronometerManager:
 
                 self.last_crossing_time[channel] = current_time
 
-                crossing_time = time.time() - self.start_absolute_time
+                crossing_time_raw = time.time() - self.start_absolute_time
+                # Zastosuj offset sygnału start
+                crossing_time = max(0, crossing_time_raw - self.start_signal_offset)
 
                 is_blocked = self.osf_block_var.get()
 
@@ -2739,7 +2776,9 @@ class ChronometerManager:
         # === NAPRAWA: Nie wysyłaj pakietów OSF gdy jesteśmy w trybie LA ===
         if self.timer_running and self.start_absolute_time and not self.la_mode:
             # OBLICZ CZAS RAZ - dla pełnej synchronizacji GUI i LED
-            elapsed = time.time() - self.start_absolute_time
+            elapsed_raw = time.time() - self.start_absolute_time
+            # Zastosuj offset sygnału start (odejmij opóźnienie systemu)
+            elapsed = max(0, elapsed_raw - self.start_signal_offset)
             time_str_formatted = self.format_time_mmss(elapsed)
 
             # === NAPRAWA: Aktualizuj GUI tylko gdy bieg nie jest zakończony ===
@@ -2879,7 +2918,9 @@ class ChronometerManager:
 
         if self.la_race_active and self.la_start_absolute_time:
             # OBLICZ CZAS RAZ - dla pełnej synchronizacji
-            elapsed_la = time.time() - self.la_start_absolute_time
+            elapsed_la_raw = time.time() - self.la_start_absolute_time
+            # Zastosuj offset sygnału start (odejmij opóźnienie systemu)
+            elapsed_la = max(0, elapsed_la_raw - self.start_signal_offset)
             time_str_la = self.format_time_mmss(elapsed_la)
 
             # Aktualizuj GUI
@@ -3017,7 +3058,9 @@ class ChronometerManager:
             messagebox.showerror("Błąd", "Brak startu!")
             return
 
-        result_time = time.time() - self.start_absolute_time
+        result_time_raw = time.time() - self.start_absolute_time
+        # Zastosuj offset sygnału start
+        result_time = max(0, result_time_raw - self.start_signal_offset)
 
         mode_text = self.mode_var.get()
 
