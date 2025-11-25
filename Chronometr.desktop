@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Chronometr Manager v5 LED
+Comment=System chronometru OSF + LA z tablicą LED
+Exec=/usr/local/bin/python3 /home/user/sms-proxy/chronometr_v5_LED.py
+Path=/home/user/sms-proxy
+Icon=applications-games
+Terminal=false
+Categories=Utility;Application;
+StartupNotify=true
