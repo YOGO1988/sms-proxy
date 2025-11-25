@@ -726,10 +726,13 @@ class ChronometerManager:
         tk.Label(top_frame, text="Offset startu (ms):", font=('Arial', 8), bg='#e8e8e8').pack(side=tk.LEFT, padx=(10, 3))
 
         self.start_offset_var = tk.IntVar(value=180)  # Domyślnie 180ms
-        self.start_offset_scale = tk.Scale(top_frame, from_=0, to=500, orient=tk.HORIZONTAL,
-                                           variable=self.start_offset_var, command=self.on_start_offset_change,
-                                           length=100, width=10, bg='#e8e8e8', resolution=10)
-        self.start_offset_scale.pack(side=tk.LEFT, padx=3)
+        self.start_offset_spinbox = tk.Spinbox(top_frame, from_=-2000, to=2000, increment=100,
+                                               textvariable=self.start_offset_var,
+                                               command=self.on_start_offset_change,
+                                               width=6, font=('Arial', 9), bg='white')
+        self.start_offset_spinbox.pack(side=tk.LEFT, padx=3)
+        # Bind także zmiany ręczne (wpisywanie)
+        self.start_offset_var.trace_add('write', lambda *args: self.on_start_offset_change())
 
         # === POLE TEKSTOWE STATYCZNE ===
         tk.Label(top_frame, text="Linia 1:", font=('Arial', 8), bg='#e8e8e8').pack(side=tk.LEFT, padx=(10, 3))
@@ -820,10 +823,15 @@ class ChronometerManager:
         if self.led_enabled and self.led_manager:
             self.led_manager.display.set_brightness(self.led_brightness)
 
-    def on_start_offset_change(self, value):
+    def on_start_offset_change(self, value=None):
         """Callback zmiany offsetu sygnału start"""
-        self.start_signal_offset = int(value) / 1000.0  # Konwersja z ms na sekundy
-        print(f"⏱️  Offset sygnału start: {self.start_signal_offset:.3f}s ({int(value)}ms)")
+        try:
+            offset_ms = self.start_offset_var.get()
+            self.start_signal_offset = offset_ms / 1000.0  # Konwersja z ms na sekundy
+            print(f"⏱️  Offset sygnału start: {self.start_signal_offset:.3f}s ({offset_ms}ms)")
+        except tk.TclError:
+            # Ignoruj błędy podczas edycji (pole puste)
+            pass
 
     def send_custom_text(self):
         """Wysyła własny tekst na tablicę LED"""
@@ -2125,20 +2133,22 @@ class ChronometerManager:
             if not self.ready_for_start:
                 return
 
+            # KRYTYCZNE: Ustaw czas startu NAJPIERW, przed operacjami LED
+            self.start_time = time_seconds
+            self.start_absolute_time = time.time()
+
             # Wyczyść LED i wyślij pakiety inicjalizacyjne dla obu torów
             if self.led_enabled and self.led_manager:
                 self.led_manager.display.clear_display()
-                time.sleep(0.1)  # Pauza po czyszczeniu
+                # NAPRAWIONO: Usunięto time.sleep(0.1) - powodowało opóźnienie ~1 sekundy
                 init_packet1 = create_init_packet_line1("TOR 1    0)")
                 init_packet2 = create_init_packet_line2("TOR 2    0)")
-                self.led_manager.display.send_packet(init_packet1, delay=0.1)  # Zwiększone opóźnienie
-                self.led_manager.display.send_packet(init_packet2, delay=0.1)  # Zwiększone opóźnienie
+                self.led_manager.display.send_packet(init_packet1, delay=0.05)
+                self.led_manager.display.send_packet(init_packet2, delay=0.05)
                 self.led_init_sent_time = time.time()  # BLOKADA: Ustaw czas wysłania INIT
                 print(f"📺 LED: START - pakiety inicjalizacyjne dla obu torów (blokada przez {self.led_init_block_duration}s)")
 
             # Zresetuj wszystkie zmienne biegu
-            self.start_time = time_seconds
-            self.start_absolute_time = time.time()
             self.timer_running = True
             self.race_in_progress = True
             self.race_completed = False
@@ -3005,22 +3015,23 @@ class ChronometerManager:
             messagebox.showwarning("Uwaga", "Kliknij KOLEJNY BIEG!")
             return
 
+        # KRYTYCZNE: Ustaw czas startu NAJPIERW, przed operacjami LED
+        self.start_time = 0
+        self.start_absolute_time = time.time()
+
         # === WYCZYŚĆ LED PRZY STARCIE I WYŚLIJ PAKIETY INICJALIZACYJNE ===
         if self.led_enabled and self.led_manager:
             self.led_manager.display.clear_display()
-            time.sleep(0.1)  # Pauza po czyszczeniu
+            # NAPRAWIONO: Usunięto time.sleep(0.1) - powodowało opóźnienie
             # Wyślij pakiety inicjalizacyjne dla trybu DWA TORY
             mode_text = self.mode_var.get()
             if "DWA TORY" in mode_text or "DRUŻYNA" in mode_text or "WAHADŁO" in mode_text:
                 init_packet1 = create_init_packet_line1("TOR 1    0)")
                 init_packet2 = create_init_packet_line2("TOR 2    0)")
-                self.led_manager.display.send_packet(init_packet1, delay=0.1)  # Zwiększone opóźnienie
-                self.led_manager.display.send_packet(init_packet2, delay=0.1)  # Zwiększone opóźnienie
+                self.led_manager.display.send_packet(init_packet1, delay=0.05)
+                self.led_manager.display.send_packet(init_packet2, delay=0.05)
                 self.led_init_sent_time = time.time()  # BLOKADA: Ustaw czas wysłania INIT
                 print(f"📺 LED: Wysłano pakiety inicjalizacyjne dla obu torów (START RĘCZNY, blokada przez {self.led_init_block_duration}s)")
-
-        self.start_time = 0
-        self.start_absolute_time = time.time()
         self.timer_running = True
         self.race_in_progress = True
         self.race_completed = False
