@@ -2729,15 +2729,15 @@ class ChronometerManager:
                 if not init_block_active:
                     if self.current_mode in [MeasurementMode.OSF_DWA_TORY, MeasurementMode.OSF_DRUZYNA, MeasurementMode.WACHADLO]:
                         # === TRYBY Z DWOMA TORAMI - KAŻDA LINIA NIEZALEŻNA ===
-                        # LOGIKA ZGODNA Z ORYGINALNYM PROGRAMEM:
-                        # - Podczas biegu: pakiety 0x3A z czasem + " - "
+                        # LOGIKA:
+                        # - Podczas biegu: pakiety 0x3A z czasem BEZ myślnika
                         # - Gdy tor kończy: JEDEN pakiet 0x3E z czasem + "TOR X"
                         # - Potem: BRAK pakietów dla tego toru
 
                         # LINIA 1 - TOR 1
                         if not self.left_lane_finished:
-                            # Tor 1 biegnie - wyświetl bieżący czas (pakiet 0x3A)
-                            packet1 = create_time_packet_line1(time_str_formatted, add_dash=True)
+                            # Tor 1 biegnie - wyświetl bieżący czas BEZ myślnika (pakiet 0x3A)
+                            packet1 = create_time_packet_line1(time_str_formatted, add_dash=False)
                         elif self.left_lane_result is not None and not self.left_lane_finish_packet_sent:
                             # Tor 1 zakończony - wyślij JEDEN pakiet finałowy (0x3E)
                             result_str = self.format_time_mmss(self.left_lane_result)
@@ -2749,8 +2749,8 @@ class ChronometerManager:
 
                         # LINIA 2 - TOR 2
                         if not self.right_lane_finished:
-                            # Tor 2 biegnie - wyświetl bieżący czas (pakiet 0x3A)
-                            packet2 = create_time_packet_line2(time_str_formatted, add_dash=True)
+                            # Tor 2 biegnie - wyświetl bieżący czas BEZ myślnika (pakiet 0x3A)
+                            packet2 = create_time_packet_line2(time_str_formatted, add_dash=False)
                         elif self.right_lane_result is not None and not self.right_lane_finish_packet_sent:
                             # Tor 2 zakończony - wyślij JEDEN pakiet finałowy (0x3E)
                             result_str = self.format_time_mmss(self.right_lane_result)
